@@ -26,7 +26,7 @@ class Game:
         while self.running:
             self.handle_events()
             self.draw()
-            self.clock.tick(60)
+            self.clock.tick(FPS)
 
 '''
 # ! ONLY REMOVE COMMENT TO TEST
