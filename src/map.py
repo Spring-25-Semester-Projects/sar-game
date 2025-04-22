@@ -1,80 +1,99 @@
-import sys
-import pygame
-import math
-import random
+import numpy as np
+from config import WIDTH, HEIGHT, HEX_COLOR
 
-class Game:
-    def __init__(self):
-        pygame.init()
-        pygame.display.set_caption('Hex Grid')
-        self.screen = pygame.display.set_mode((1080, 800))
-        self.clock = pygame.time.Clock()
+CONST_unit_direction = np.array([[1, -1, 0],[1, 0, -1],[0, 1, -1],[-1, 1, 0],[-1, 0, 1],[0, -1, 1]])
 
-        self.hex_size = 30
-        self.rows, self.cols = 100, 100
+CONST_flatTopped_matrix = np.array([[3/2, 0],[np.sqrt(3)/2, np.sqrt(3)]])
 
-        self.hex_height = math.sqrt(3) * self.hex_size
-        self.hex_width = 2 * self.hex_size
+CONST_screen_matrix = np.array([[0, 0],[WIDTH, 0],[0, HEIGHT],[WIDTH, HEIGHT]]) - np.array([WIDTH/2,HEIGHT/2]) # Sceond term is to center.
 
-        self.terrain_colors = {
-            'plain': (180, 220, 160),
-            'forest': (34, 139, 34),
-            'mountain': (128, 128, 128),
-            'water': (70, 130, 180)
-        }
+class Center:
+    def __init__(self, q=0, r=0):
+        self.q, self.r = q, r
 
-        self.traversal_costs = {
-            'plain': 1,
-            'forest': 3,
-            'mountain': 5,
-            'water': float('inf')  #Means that they can never cross water
-        }
+class Hex:
+    def __init__(self, x=0, y=0, z=0):
+        self.x, self.y, self.z = x, y, z
 
-        self.grid = self.generate_grid()
+    def __eq__(self, other):
+        return isinstance(other, Hex) and \
+               self.x == other.x and self.y == other.y and self.z == other.z
 
-    def generate_grid(self):
-        grid = []
-        for col in range(self.cols):
-            for row in range(self.rows):
-                terrain = random.choices(
-                    list(self.terrain_colors.keys()),
-                    weights=[0.2, 0.6, 0.15, 0.05]
-                )[0]
-                cost = self.traversal_costs[terrain]
-                grid.append((col, row, terrain, cost))
-        return grid
+    def __hash__(self):
+        hq = hash(self.x)
+        hr = hash(self.y)
 
-    def get_hex_position(self, col, row):
-        x = self.hex_size * 3/2 * col
-        y = self.hex_height * (row + 0.5 * (col % 2))
-        return int(x), int(y)
+        return hq ^ (hr + 0x9e3779b9 + ((hq << 6) & 0xFFFFFFFFFFFFFFFF) + (hq >> 2))
 
-    def draw_hex(self, x, y, color):
-        corners = []
+class Map(Hex):
+    def __init__(self, radius=10):
+        self.radius = radius
+
+        # This long variable just turns the pixel coord.’s to hex coord. (for screen), so it knows where the tile boundary is.
+        screen_to_hex_matrix = np.array([np.linalg.inv(self.radius * CONST_flatTopped_matrix) @ ar for ar in CONST_screen_matrix]) 
+
+        min_screenHex = np.floor(np.min(screen_to_hex_matrix, axis=0))-2
+        max_screenHex = np.ceil(np.max(screen_to_hex_matrix, axis=0))+2
+        min_x, min_z = map(int, min_screenHex)
+        max_x, max_z = map(int, max_screenHex)
+
+        self.hexes = {}
+        for q in range(min_x, max_x + 1):
+            for r in range(min_z, max_z + 1):
+                s = -q-r
+                h = Hex(q, r, s)
+
+                self.hexes[h] = h
+
+    def hex_to_screen(self, hex: Hex):
+        hexagon_matrix = self.radius * (CONST_flatTopped_matrix @ np.array([hex.x, hex.z]))
+
+        return Center(*hexagon_matrix)
+    
+    def screen_to_hex(self, hex: Hex):
+        center = self.hex_to_screen(hex)
+
+        radius = np.sqrt(3)/2
+        t1, t2 = center.q, center.r/radius
+
+        z = np.floor((np.floor(center.r / radius) + np.floor(t2 - t1) + 2) / 3)
+        x = np.floor((np.floor(t1 - t2) + np.floor(t2 - t1) + 2) / 3)
+
+        class Cube:
+            def __init__(self, a=0, b=0, c=0):
+                self.a, self.b, self.c = a, b, c
+
+        return Cube(x,-x-z,z)
+    
+    def neighbor_hex(self, hex: Hex):
+        neighbors_matrix = (np.array([hex.x, hex.y, hex.z]) + CONST_unit_direction)
+
+        return neighbors_matrix
+    
+    def draw_hex(self, hex: Hex, entityHex=None):
+        center = self.hex_to_screen(hex)
+
+        vertices = []
+        color = HEX_COLOR
+
+        if entityHex is not None:
+            neighbors = self.neighbor_hex(entityHex)
+
+            print("Entity at", np.array([hex.x, hex.y, hex.z]), "neighbors:", neighbors)
+            for hex_nb in neighbors:
+                print([hex.x, hex.y, hex.z], hex_nb, np.array_equal([hex.x, hex.y, hex.z], hex_nb))
+                if np.array_equal([hex.x, hex.y, hex.z], hex_nb):
+                    color = (231, 76, 60)
+
+                    print("  → Highlighting", hex)
+                    break
+
         for i in range(6):
-            angle = math.pi / 3 * i
-            cx = x + self.hex_size * math.cos(angle)
-            cy = y + self.hex_size * math.sin(angle)
-            corners.append((cx, cy))
-        pygame.draw.polygon(self.screen, color, corners)
-        pygame.draw.polygon(self.screen, (0, 0, 0), corners, 2)
+            angle = np.radians(60 * i)
 
-    def run(self):
-        while True:
-            self.screen.fill((255, 255, 255))
+            x = center.q + (self.radius * np.cos(angle))
+            y = center.r + (self.radius * np.sin(angle))
 
-            for col, row, terrain, cost in self.grid:
-                x, y = self.get_hex_position(col, row)
-                color = self.terrain_colors[terrain]
-                self.draw_hex(x, y, color)
+            vertices.append([x + WIDTH/2,y + HEIGHT/2])
 
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit()
-
-            pygame.display.update()
-            self.clock.tick(60)
-
-game = Game()
-game.run()
+        return vertices, color
