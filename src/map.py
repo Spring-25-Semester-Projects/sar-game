@@ -79,13 +79,10 @@ class Map(Hex):
         if entityHex is not None:
             neighbors = self.neighbor_hex(entityHex)
 
-            print("Entity at", np.array([hex.x, hex.y, hex.z]), "neighbors:", neighbors)
             for hex_nb in neighbors:
-                print([hex.x, hex.y, hex.z], hex_nb, np.array_equal([hex.x, hex.y, hex.z], hex_nb))
                 if np.array_equal([hex.x, hex.y, hex.z], hex_nb):
                     color = (231, 76, 60)
 
-                    print("  → Highlighting", hex)
                     break
 
         for i in range(6):

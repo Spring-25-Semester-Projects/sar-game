@@ -5,6 +5,9 @@ from config import WIDTH, HEIGHT, FPS
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("SAR Game")
 
+fav_icon = pygame.image.load("../assets/imgs/fav.png")
+pygame.display.set_icon(fav_icon)
+
 class Game:
     def __init__(self):
         pygame.init()
