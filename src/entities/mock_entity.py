@@ -1,9 +1,9 @@
 from .. import Game, pygame
 from config import ENTITY_COLOR
 
-class Entity(pygame.sprite.Sprite, Game):
-    def __init__(self, position, radius, color=ENTITY_COLOR, width=0):
-        pygame.sprite.Sprite.__init__(self)
-        screen = Game().screen
-        self.rect = pygame.draw.circle(screen, position, color, radius, width)
-        self.area = screen.get_rect()
+class Entity(pygame.sprite.Sprite):
+    def __init__(self, game, position, radius, color=ENTITY_COLOR, width=0):
+        super().__init__(self)
+        self.game = game
+        self.rect = pygame.draw.circle(self.game.screen, position, color, radius, width)
+        self.area = self.screen.get_rect()
