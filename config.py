@@ -9,7 +9,7 @@ HEX_H = 10
 
 ENTITY_COLOR = (0,0,0)
 
-# ENTITIES
+# Survivor ENTITY
 
 TILE_SIZE = 32
 MAX_RISK  = 100.0
