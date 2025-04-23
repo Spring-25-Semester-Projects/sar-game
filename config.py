@@ -9,5 +9,12 @@ HEX_H = 10
 
 ENTITY_COLOR = (0,0,0)
 
+# ENTITIES
+
+TILE_SIZE = 32
+MAX_RISK  = 100.0
+
+#
+
 load_dotenv()
 DEBUG = os.getenv("DEBUG", "False") == "True"
