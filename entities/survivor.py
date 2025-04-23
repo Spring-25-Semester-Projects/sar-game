@@ -33,7 +33,7 @@ class Survivor(pygame.sprite.Sprite):
     def __init__(self, start_tile, grid, risk_map, speed=100):
         super().__init__()
 
-        raw = pygame.image.load("/home/mostafabakr/Desktop/Discrete & Algo/sar-game-5-survivor/assets/imgs/survivor.jpeg").convert_alpha()
+        raw = pygame.image.load("assets/imgs/survivor.jpeg").convert_alpha()
         raw = pygame.transform.scale(raw, (TILE_SIZE, TILE_SIZE))
 
         mask_surf = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
