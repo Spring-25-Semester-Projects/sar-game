@@ -1,12 +1,25 @@
 import numpy as np
-from hex import Hex, Center
 from config import WIDTH, HEIGHT, HEX_COLOR
 
-CONST_unit_direction = np.array([[0, -1, 1], [1, -1, 0], [-1, 0, 1], [0, 1, -1], [1, 0, -1], [-1, 1, 0]])
+CONST_unit_direction = np.array([[1, -1, 0],[1, 0, -1],[0, 1, -1],[-1, 1, 0],[-1, 0, 1],[0, -1, 1]])
 
 CONST_flatTopped_matrix = np.array([[3/2, 0],[np.sqrt(3)/2, np.sqrt(3)]])
 
 CONST_screen_matrix = np.array([[0, 0],[WIDTH, 0],[0, HEIGHT],[WIDTH, HEIGHT]]) - np.array([WIDTH/2,HEIGHT/2]) # Sceond term is to center.
+
+class Center:
+    def __init__(self, q=0, r=0):
+        self.q, self.r = q, r
+
+class Hex:
+    def __init__(self, x=0, y=0, z=0):
+        self.x, self.y, self.z = x, y, z
+
+    def __hash__(self):
+        hq = hash(self.x)
+        hr = hash(self.y)
+
+        return hq ^ (hr + 0x9e3779b9 + ((hq << 6) & 0xFFFFFFFFFFFFFFFF) + (hq >> 2))
 
 class Map(Hex):
     def __init__(self, radius=10):
