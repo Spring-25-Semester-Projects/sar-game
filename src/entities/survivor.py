@@ -2,6 +2,7 @@ import random
 import pygame
 import sys
 import os
+import heapq
 from collections import namedtuple
 import numpy as np
 
@@ -110,45 +111,51 @@ class Map(Hex):
 
 # end of map.py
 
+# Direction indices for flat-topped hex grid
 Directions = namedtuple('Direction', ['SS', 'SE', 'SW', 'NN', 'NE', 'NW'])
 CONST_DIRECTION = Directions(SS=0, SE=1, SW=2, NN=3, NE=4, NW=5)
 
-class Entity:
-
-    def __init__(self, game_map: Map, color=ENTITY_COLOR, health=100):
-        self.hex = Hex()
+class AStarPathfinder:
+    def __init__(self, game_map: Map):
         self.map = game_map
-        self.color = color
-        self.health = health
-        self.position = self._hex_to_screen()
 
-    def _hex_to_screen(self):
-        center = self.map.hex_to_screen(self.hex)
-        return (int(center.q + OFFSET[0]), int(center.r + OFFSET[1]))
+    def heuristic(self, a: Hex, b: Hex) -> int:
+        return max(abs(a.x - b.x), abs(a.y - b.y), abs(a.z - b.z))
 
-    def move(self, direction: str):
-        neighbors = self.map.neighbor_hex(self.hex)
-        idx = getattr(CONST_DIRECTION, direction, None)
-        if idx is None or idx >= len(neighbors):
-            return False
-        self.hex = Hex(*neighbors[idx])
-        self.position = self._hex_to_screen()
-        return True
+    def get_neighbors(self, node: Hex) -> list:
+        raw = self.map.neighbor_hex(node)
+        neighbors = []
+        for coords in raw:
+            q, r, s = coords
+            h = Hex(int(q), int(r), int(s))
+            if h in self.map.hexes:
+                neighbors.append(h)
+        return neighbors
 
-    def take_damage(self, amount: int) -> int:
-        self.health -= amount
-        return self.health
+    def find_path(self, start: Hex, goal: Hex) -> list:
+        open_set = []
+        heapq.heappush(open_set, (0, start))
+        came_from = {}
+        g_score = {start: 0}
+        f_score = {start: self.heuristic(start, goal)}
 
-    def is_alive(self) -> bool:
-        return self.health > 0
+        while open_set:
+            _, current = heapq.heappop(open_set)
+            if current == goal:
+                path = []
+                while current in came_from:
+                    path.append(current)
+                    current = came_from[current]
+                return list(reversed(path))
 
-    def update(self, dt):
-        pass
-
-    def render(self, surface: pygame.Surface):
-        vertices, _ = self.map.draw_hex(self.hex, self.hex)
-        pygame.draw.polygon(surface, self.color, vertices)
-        pygame.draw.polygon(surface, (255, 255, 255), vertices, 2)
+            for neighbor in self.get_neighbors(current):
+                tentative_g = g_score[current] + 1
+                if tentative_g < g_score.get(neighbor, float('inf')):
+                    came_from[neighbor] = current
+                    g_score[neighbor] = tentative_g
+                    f_score[neighbor] = tentative_g + self.heuristic(neighbor, goal)
+                    heapq.heappush(open_set, (f_score[neighbor], neighbor))
+        return []
 
 class Inventory:
     def __init__(self, capacity: int = 10):
@@ -170,6 +177,49 @@ class Inventory:
     def has(self, name: str) -> bool:
         return any(item.name == name for item in self.items)
 
+    def clear(self):
+        self.items.clear()
+
+    def list_items(self) -> list:
+        return [item.name for item in self.items]
+
+class Entity:
+    def __init__(self, game_map: Map, color=ENTITY_COLOR, health=100):
+        self.hex = Hex()
+        self.map = game_map
+        self.color = color
+        self.health = health
+        self.position = self._hex_to_screen()
+
+    def _hex_to_screen(self) -> tuple:
+        center = self.map.hex_to_screen(self.hex)
+        return (int(center.q + OFFSET[0]), int(center.r + OFFSET[1]))
+
+    def move(self, direction: str) -> bool:
+        neighbors = self.map.neighbor_hex(self.hex)
+        idx = getattr(CONST_DIRECTION, direction, None)
+        if idx is None or idx >= len(neighbors):
+            return False
+        self.hex = Hex(*neighbors[idx])
+        self.position = self._hex_to_screen()
+        return True
+
+    def move_to(self, target_hex: Hex, pathfinder: AStarPathfinder) -> bool:
+        path = pathfinder.find_path(self.hex, target_hex)
+        if not path:
+            return False
+        for step in path:
+            self.hex = step
+            self.position = self._hex_to_screen()
+        return True
+
+    def take_damage(self, amount: int) -> int:
+        self.health -= amount
+        return self.health
+
+    def is_alive(self) -> bool:
+        return self.health > 0
+
 class Item:
     def __init__(self, name: str, hex: Hex):
         self.name = name
@@ -177,11 +227,6 @@ class Item:
 
     def apply(self, target: Entity):
         raise NotImplementedError
-
-    def render(self, surface: pygame.Surface, game_map: Map):
-        vertices, color = game_map.draw_hex(self.hex)
-        pygame.draw.polygon(surface, color, vertices)
-        pygame.draw.polygon(surface, (255, 255, 255), vertices, 2)
 
 class Weapon(Item):
     def __init__(self, name: str, damage: int, hex: Hex):
@@ -206,15 +251,21 @@ class Survivor(Entity):
         self.inventory = Inventory()
         self.stamina = 100.0
         self.hunger = 0.0
+        self.pathfinder = AStarPathfinder(game_map)
 
-    def move(self, direction: str):
-        if self.stamina <= 0:
+    def move(self, direction: str) -> bool:
+        if self.stamina < 1:
             return False
-        for _ in range(self.speed):
-            super().move(direction)
+        moved = super().move(direction)
+        if moved:
             self.stamina -= 1
             self.hunger += 0.5
-        return True
+        return moved
+
+    def move_towards(self, target: Hex) -> bool:
+        if self.stamina < 1:
+            return False
+        return super().move_to(target, self.pathfinder)
 
     def attack(self, target: Entity, weapon: Weapon = None):
         if weapon and weapon in self.inventory.items:
@@ -228,7 +279,7 @@ class Survivor(Entity):
         self.stamina = min(self.stamina + amount * 0.5, 100)
 
     def pick_item(self, item: Item) -> bool:
-        if item.hex.x == self.hex.x and item.hex.y == self.hex.y and item.hex.z == self.hex.z:
+        if item.hex == self.hex:
             return self.inventory.add(item)
         return False
 
@@ -238,48 +289,43 @@ class Survivor(Entity):
             return True
         return False
 
+    def rest(self, duration: float):
+        self.stamina = min(self.stamina + duration * 5, 100)
+        self.hunger = min(self.hunger + duration * 0.2, 100)
+
+    def heal(self, amount: int):
+        self.health = min(self.health + amount, 100)
+
     def update(self, dt):
         self.hunger += 0.1 * dt
         if self.hunger > 100:
             self.take_damage(1 * dt)
         self.stamina = min(self.stamina + 0.5 * dt, 100)
 
-    def render_status(self, surface: pygame.Surface):
-        # Health bar
-        pygame.draw.rect(surface, (255,0,0), (10,10, 200, 20))
-        pygame.draw.rect(surface, (0,255,0), (10,10, 2 * max(self.health,0), 20))
-        # Hunger bar
-        pygame.draw.rect(surface, (139,69,19), (10,40, 200, 20))
-        pygame.draw.rect(surface, (255,255,0), (10,40, 2 * min(self.hunger,100), 20))
-        # Stamina bar
-        pygame.draw.rect(surface, (169,169,169), (10,70, 200, 20))
-        pygame.draw.rect(surface, (0,191,255), (10,70, 2 * self.stamina, 20))
-
 class NPC(Survivor):
     def __init__(self, game_map: Map, ai_type: str ='wander', color=ENTITY_COLOR, health: int =100, speed: int =1):
         super().__init__(game_map, color, health, speed)
         self.ai_type = ai_type
-        self.target = None
 
     def decide(self, player: Survivor) -> str:
         if self.ai_type == 'wander':
             return random.choice(list(CONST_DIRECTION._fields))
-        elif self.ai_type == 'chase':
-            # simple chase: find direction towards player
+        if self.ai_type == 'chase':
             dq = player.hex.x - self.hex.x
             dz = player.hex.z - self.hex.z
             if abs(dq) >= abs(dz):
                 return 'SE' if dq>0 else 'NW'
-            else:
-                return 'SW' if dz>0 else 'NN'
+            return 'SW' if dz>0 else 'NN'
         return None
 
     def update(self, dt, player: Survivor):
         super().update(dt)
-        direction = self.decide(player)
-        if direction:
-            self.move(direction)
-
+        if self.ai_type == 'chase':
+            self.move_towards(player.hex)
+        else:
+            direction = self.decide(player)
+            if direction:
+                self.move(direction)
 
 def spawn_items(game_map: Map, num_items: int =10) -> list:
     items = []
