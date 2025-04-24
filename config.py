@@ -9,7 +9,9 @@ HEX_H = 30
 
 HEX_COLOR = (30, 30, 30)
 
-ENTITY_COLOR = (0,0,0)
+ENTITY_COLOR = (46, 204, 113)
+
+OFFSET = (WIDTH/2, HEIGHT/2)
 
 load_dotenv()
 DEBUG = os.getenv("DEBUG", "False") == "True"
