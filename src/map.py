@@ -33,40 +33,31 @@ class Map(Hex):
 
         return Center(*hexagon_matrix)
     
-    def screen_to_hex(self, hex: Hex):
-        center = self.hex_to_screen(hex)
+    def screen_to_hex(self, point):
+        scale = np.sqrt(3)/2
 
-        radius = np.sqrt(3)/2
-        t1, t2 = center.q, center.r/radius
+        t1 = point[0] / self.radius
+        t2 = (point[1] / self.radius) / np.sqrt(3)
 
-        z = np.floor((np.floor(center.r / radius) + np.floor(t2 - t1) + 2) / 3)
-        x = np.floor((np.floor(t1 - t2) + np.floor(t2 - t1) + 2) / 3)
+        y = np.floor((np.floor((point[1] / self.radius) / scale) + np.floor(t2 - t1) + 2.0) / 3.0)
+        x = np.floor((np.floor(t1 - t2) + np.floor(t1 + t2) + 2.0) / 3.0)
 
         class Cube:
             def __init__(self, a=0, b=0, c=0):
-                self.a, self.b, self.c = a, b, c
+                self.a, self.b, self.c = int(a), int(b), int(c)
 
-        return Cube(x,-x-z,z)
-    
+        return Cube(x,y,-x-y)
+
     def neighbor_hex(self, hex: Hex):
         neighbors_matrix = (np.array([hex.x, hex.y, hex.z]) + CONST_unit_direction)
 
         return neighbors_matrix
     
-    def draw_hex(self, hex: Hex, entityHex=None):
+    def draw_hex(self, hex: Hex):
         center = self.hex_to_screen(hex)
 
         vertices = []
         color = HEX_COLOR
-
-        if entityHex is not None:
-            neighbors = self.neighbor_hex(entityHex)
-
-            for hex_nb in neighbors:
-                if np.array_equal([hex.x, hex.y, hex.z], hex_nb):
-                    color = (231, 76, 60)
-
-                    break
 
         for i in range(6):
             angle = np.radians(60 * i)
