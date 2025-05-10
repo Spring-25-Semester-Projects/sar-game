@@ -6,7 +6,7 @@ import pygame
 import numpy as np
 from map import Map
 from entities.survivor import Survivor
-from config import WIDTH, HEIGHT, FPS, DEBUG
+from config import WIDTH, HEIGHT, FPS, DEBUG, SIZE, OFFSET
 
 if DEBUG:
     from utils.debugger import Debugger
@@ -19,12 +19,13 @@ fav_icon = pygame.image.load(CONST_game_icon_path)
 pygame.display.set_icon(fav_icon)
 
 class Game:
-    def __init__(self, radius=30):
+    def __init__(self, radius=SIZE):
         pygame.init()
         self.screen = screen
+        self.size = radius
         self.screen.fill((0, 0, 0))
         self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont(None, 20)
+        self.font = pygame.font.SysFont(None, int(self.size*(2/3)))
         self.running = True
         self.debugger = None
         self.events_info = []
@@ -35,16 +36,15 @@ class Game:
         self.entity = self.entities[0]
 
         if DEBUG:
-            self.debugger = Debugger(self)
+            self.debugger = Debugger(self, False)
 
     def __get_cursor(self):
-        return pygame.mouse.get_pos()
+        return np.array(pygame.mouse.get_pos())
     
     def select_hex(self):
-        point = np.array([self.__get_cursor()[0]-WIDTH/2, self.__get_cursor()[1]-HEIGHT/2])
+        point = self.__get_cursor() - OFFSET
 
         cube = self.map.screen_to_hex(point)
-        cube = [cube.a, cube.b, cube.c]
 
         return cube
 
@@ -66,8 +66,9 @@ class Game:
             dir = mapping.get(event.key)
             if dir:
                 self.entity.move(dir)
+
                 if self.debugger:
-                    self.debugger.get_entity_feed()
+                    self.debugger.get_entity_feed(dir)
     
     def update_event_info(self):
         for event in pygame.event.get():
@@ -96,11 +97,11 @@ class Game:
                 vertices, color = self.map.draw_hex(h)
 
                 pygame.draw.polygon(self.screen, color, vertices)
-                pygame.draw.polygon(self.screen, (255, 255, 255), vertices, 1)
+                pygame.draw.polygon(self.screen, (200, 200, 200), vertices, 1)
 
     def spawn(self):
         for entity in self.entities:
-            pygame.draw.circle(self.screen, entity.color, entity.position, radius=20)
+            pygame.draw.circle(self.screen, entity.color, entity.position, radius=int(self.size*(3/5)))
 
     def run(self):
         while self.running:
