@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 WIDTH, HEIGHT = 1400, 800
 FPS = 60
 
-HEX_COLOR = (30, 30, 30)
+HEX_COLOR = (50, 50, 50)
 
 ENTITY_COLOR = (46, 204, 113)
 
