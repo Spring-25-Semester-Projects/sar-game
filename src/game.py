@@ -2,9 +2,10 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
  
+from collections import deque
 import pygame
 import numpy as np
-from map import Map
+from map import Map, Hex
 from entities.survivor import Survivor
 from config import WIDTH, HEIGHT, FPS, DEBUG, SIZE, OFFSET
 
@@ -28,11 +29,13 @@ class Game:
         self.font = pygame.font.SysFont(None, int(self.size*(2/3)))
         self.running = True
         self.debugger = None
+        self.removeFog = False
         self.events_info = []
         self.map = Map(radius)
         self.entities = [Survivor(self.map)]
         
         # ! This is just for testing.
+        self.visited = deque([self.entities[0].hexEntity]) # ! Change it through out doc
         self.entity = self.entities[0]
 
         if DEBUG:
@@ -47,6 +50,14 @@ class Game:
         cube = self.map.screen_to_hex(point)
 
         return cube
+    
+    def discover_hex(self):
+        h = self.entities[0].hexEntity
+        
+        if h in self.visited:
+            return None
+
+        self.visited.append(h)    
 
     def handle_single_event(self, event):
         if event.type == pygame.QUIT:
@@ -66,6 +77,7 @@ class Game:
             dir = mapping.get(event.key)
             if dir:
                 self.entity.move(dir)
+                self.discover_hex()
 
                 if self.debugger:
                     self.debugger.get_entity_feed(dir)
@@ -91,13 +103,31 @@ class Game:
 
     def handle_events(self):
         self.update_event_info()
+
+    def fog(self, h, color, border_color):
+        if self.debugger:
+            if self.debugger.toggleOverlay and self.debugger.removeFog:
+                return color, border_color
+
+        if not (h in self.visited):
+            border_color,color = (0,0,0),(0,0,0)
+
+        if np.any(np.all(self.map.neighbor_hex(self.entities[0].hexEntity) == np.array([h.x,h.y,h.z]), axis=1)):
+            if color == (0,0,0) and color != (50,50,50):
+                color = (30,30,30)
+
+        return color, border_color
             
     def draw_map(self):
+        border_color = (200,200,200)
+
         for h in self.map.hexes.values():
                 vertices, color = self.map.draw_hex(h)
 
+                color, border_color = self.fog(h,color,border_color)
+
                 pygame.draw.polygon(self.screen, color, vertices)
-                pygame.draw.polygon(self.screen, (200, 200, 200), vertices, 1)
+                pygame.draw.polygon(self.screen, border_color, vertices, 1)
 
     def spawn(self):
         for entity in self.entities:
