@@ -8,6 +8,7 @@ class Debugger:
         self.game = game
         self.live = live
         self.walk = []
+        self.removeFog = self.game.removeFog
         self.toggleOverlay = False
 
     def get_entity_pos(self, direction):
@@ -45,7 +46,14 @@ class Debugger:
             mouse_position = np.array(event.pos)-OFFSET
             pcube = self.game.map.screen_to_hex(mouse_position)
 
-            print(f"{{x: {pcube.a}, y: {pcube.b}, z: {pcube.c}.}}:{{x: {mouse_position[0]}, y: {mouse_position[1]}}}")    
+            print(f"{{x: {pcube.a}, y: {pcube.b}, z: {pcube.c}.}}:{{x: {mouse_position[0]}, y: {mouse_position[1]}}}")  
+
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_f and self.toggleOverlay:
+            self.removeFog = not self.removeFog
+
+            print("Hexagons visited:")
+            for h in self.game.visited:
+                print(f"{h.x,h.y,h.z}.")
 
     def overlay(self):
         if not self.toggleOverlay:
