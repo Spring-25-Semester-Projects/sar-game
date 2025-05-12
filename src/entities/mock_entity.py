@@ -1,4 +1,5 @@
 from collections import namedtuple
+import numpy as np
 from map import Map, Hex
 from config import ENTITY_COLOR, OFFSET
 
@@ -16,11 +17,14 @@ class Entity():
     def entity_position(self):
         center = self.map.hex_to_screen(self.hexEntity)
 
-        position = (center.q + OFFSET[0], center.r + OFFSET[1])
+        position = np.array([center.q,center.r])+OFFSET
 
         return position
         
     def move(self, move_dir):
+        if self.points <= 0:
+            return None
+
         move_to_tiles = self.map.neighbor_hex(self.hexEntity)
 
         i = getattr(CONST_direction, move_dir, None)
