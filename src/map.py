@@ -8,7 +8,7 @@ CONST_flatTopped_matrix = np.array([[3/2, 0],[np.sqrt(3)/2, np.sqrt(3)]])
 
 CONST_screen_matrix = np.array([[0, 0],[WIDTH, 0],[0, HEIGHT],[WIDTH, HEIGHT]]) - OFFSET # Sceond term is to center.
 
-class Map(Hex):
+class Map:
     def __init__(self, radius=SIZE):
         self.radius = radius
 
@@ -17,6 +17,10 @@ class Map(Hex):
 
         min_screenHex = np.floor(np.min(screen_to_hex_matrix, axis=0))-2
         max_screenHex = np.ceil(np.max(screen_to_hex_matrix, axis=0))+2
+
+        self.min_x, self.min_z = min_screenHex
+        self.max_x, self.max_z = max_screenHex
+
         min_x, min_z = map(int, min_screenHex)
         max_x, max_z = map(int, max_screenHex)
 
