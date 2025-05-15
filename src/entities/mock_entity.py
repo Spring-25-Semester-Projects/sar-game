@@ -1,4 +1,5 @@
 from collections import namedtuple
+import pygame
 import numpy as np
 from map import Map, Hex
 from config import ENTITY_COLOR, OFFSET
@@ -6,7 +7,18 @@ from config import ENTITY_COLOR, OFFSET
 Directions = namedtuple('Direction', ['SS', 'SE', 'SW', 'NN', 'NE', 'NW'])
 CONST_direction = Directions(SS=0, SE=1, SW=2, NN=3, NE=4, NW=5)
 
-class Entity():
+class SpriteSheet:
+    def __init__(self, image):
+        self.sheet = image
+        
+    def get_img(self, frame, width, height, scale, color):
+        image = pygame.Surface((width, height)).convert_alpha()
+        image.blit(self.sheet, (0, 0), (0, (frame * height), width, height)) 
+        image = pygame.transform.scale(image, (int(width * scale), int(height * scale)))  
+        image.set_colorkey(color)
+        return image
+
+class Entity:
     def __init__(self, map: Map, color=ENTITY_COLOR):
         self.hexEntity = Hex()
         self.map = map
