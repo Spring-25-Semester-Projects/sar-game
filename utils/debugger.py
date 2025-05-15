@@ -19,7 +19,10 @@ class Debugger:
     
     def get_entity_stats(self):
         for entity in self.game.entities:
-            print(f"Entity stats. are: Health: {entity.stats[0]}, Stamina: {entity.stats[1]}, Hunger: {entity.stats[2]}.")
+            print(f"Entity {entity} stats. are:")
+
+            for stat in entity.stats:
+                print(f"{stat}.")
 
     def get_entity_feed(self, direction):
         self.get_entity_pos(direction)
@@ -32,7 +35,7 @@ class Debugger:
     def feed(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             cube = self.game.select_hex()
-            self.walk = self.game.map.walkable_hex_distance(self.game.entities[0].hexEntity, Hex(cube.a,cube.b,cube.c))
+            self.walk = self.game.map.walkable_hex_distance(self.game.entities.rescuer.hexEntity, Hex(cube.a,cube.b,cube.c))
 
             print(f"Hexagon at {{x: {cube.a}, y: {cube.b}, z: {cube.c}}} was clicked.")
             print("Hexagons to walk:")
