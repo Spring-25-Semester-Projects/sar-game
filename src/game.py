@@ -2,11 +2,12 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
  
-from collections import deque
+from collections import deque, namedtuple
 import pygame
 import numpy as np
-from map import Map, Hex
+from map import Map
 from entities.survivor import Survivor
+from entities.rescuer import Rescuer
 from config import WIDTH, HEIGHT, FPS, DEBUG, SIZE, OFFSET
 
 if DEBUG:
@@ -18,6 +19,14 @@ pygame.display.set_caption("SAR Game")
 CONST_game_icon_path = "assets/imgs/fav.png"
 fav_icon = pygame.image.load(CONST_game_icon_path)
 pygame.display.set_icon(fav_icon)
+
+Entities = namedtuple('Entities', ['survivor','rescuer'])
+
+CONST_rescuer_character_path = "assets/Males/M_01.png"
+CONST_survivor_character_path = "assets/Females/F_01.png"
+
+rescuer_img = pygame.image.load(CONST_rescuer_character_path).convert_alpha()
+survivor_img = pygame.image.load(CONST_survivor_character_path).convert_alpha()
 
 class Game:
     def __init__(self, radius=SIZE):
@@ -32,11 +41,8 @@ class Game:
         self.removeFog = False
         self.events_info = []
         self.map = Map(radius)
-        self.entities = [Survivor(self.map)]
-        
-        # ! This is just for testing.
-        self.visited = deque([self.entities[0].hexEntity]) # ! Change it through out doc
-        self.entity = self.entities[0]
+        self.entities = Entities(Survivor(self.map), Rescuer(self.map))
+        self.visited = deque([self.entities.rescuer.hexEntity])
 
         if DEBUG:
             self.debugger = Debugger(self, False)
@@ -52,7 +58,7 @@ class Game:
         return cube
     
     def discover_hex(self):
-        h = self.entities[0].hexEntity
+        h = self.entities.rescuer.hexEntity
         
         if h in self.visited:
             return None
@@ -76,7 +82,7 @@ class Game:
             
             dir = mapping.get(event.key)
             if dir:
-                self.entity.move(dir)
+                self.entities.rescuer.move(dir)
                 self.discover_hex()
 
                 if self.debugger:
@@ -112,8 +118,8 @@ class Game:
         if not (h in self.visited):
             border_color,color = (0,0,0),(0,0,0)
 
-        if np.any(np.all(self.map.neighbor_hex(self.entities[0].hexEntity) == np.array([h.x,h.y,h.z]), axis=1)):
-            if color == (0,0,0) and color != (50,50,50):
+        if np.any(np.all(self.map.neighbor_hex(self.entities.rescuer.hexEntity) == np.array([h.x,h.y,h.z]), axis=1)):
+            if color == (0,0,0):
                 color = (30,30,30)
 
         return color, border_color
