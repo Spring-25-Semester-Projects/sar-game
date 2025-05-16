@@ -2,6 +2,39 @@ import numpy as np
 from src.hex import Hex, Center
 from src.map import Map
 
+class Line:
+    def __init__(self, v0 : Hex = Hex(), *args : Hex):
+       self.v0 = v0
+       self.vertices = args
+    
+    def __iter__(self):
+        yield self.v0
+        yield from self.vertices
+
+def calculate_angle(p1, p2):
+
+    return np.arctan2(np.linalg.norm(np.cross(p1, p2)), np.dot(p1,p2)) # ? arctan(||p1 x p2||/(p1 · p2)) ± pi
+
+def findReflexVertex(line : Line):
+
+    line = np.array([[*h] for h in list(line)])
+    
+    reflexVertices = []
+    
+    for i in range(len(line)):
+        v1 = line[i-1] - line[i]
+        v2 = line[(i+1) % len(line)] - line[i]
+        
+        if calculate_angle(v1,v2) >= (np.pi/2):
+            reflexVertices.append(line[i])
+    
+    return reflexVertices
+
+# TODO: Algorithm:
+# * IF V_k in Line then:
+# *     IF isReflexVertex(V_k):
+# *         ReportReflexVertex(V_k) // We also have that V_k is to said to be _reflex_ to P
+
 def B_linecast(entity_hex : Hex, map : Map, limit=-1):
     center = Center(entity_hex.x,entity_hex.z)
 
