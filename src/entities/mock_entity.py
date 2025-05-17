@@ -1,7 +1,7 @@
 from collections import namedtuple
 import pygame
 import numpy as np
-from map import Map, Hex
+from src.map import Map, Hex
 from config import ENTITY_COLOR, OFFSET
 
 Directions = namedtuple('Direction', ['SS', 'SE', 'SW', 'NN', 'NE', 'NW'])
@@ -40,6 +40,9 @@ class Entity:
         move_to_tiles = self.map.neighbor_hex(self.hexEntity)
 
         i = getattr(CONST_direction, move_dir, None)
+
+        if move_to_tiles[i] == None:
+            return None
 
         self.hexEntity = move_to_tiles[i]
 
