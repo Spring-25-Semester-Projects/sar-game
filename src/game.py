@@ -53,9 +53,7 @@ class Game:
     def select_hex(self):
         point = self.__get_cursor() - OFFSET
 
-        cube = self.map.screen_to_hex(point)
-
-        return cube
+        return self.map.screen_to_hex(point)
     
     def discover_hex(self):
         h = self.entities.rescuer.hexEntity
@@ -118,7 +116,7 @@ class Game:
         if not (h in self.visited):
             border_color,color = (0,0,0),(0,0,0)
 
-        if np.any(np.all(self.map.neighbor_hex(self.entities.rescuer.hexEntity) == np.array([h.x,h.y,h.z]), axis=1)):
+        if any(neighbor == h for neighbor in  self.map.neighbor_hex(self.entities.rescuer.hexEntity)):
             if color == (0,0,0):
                 color = (30,30,30)
 

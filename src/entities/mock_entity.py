@@ -20,8 +20,8 @@ class SpriteSheet:
 
 class Entity:
     def __init__(self, map: Map, color=ENTITY_COLOR):
-        self.hexEntity = Hex()
         self.map = map
+        self.hexEntity = self.map.hexes[Hex()]
         self.color = color
         self.points = 100
         self.position = self.entity_position()
@@ -29,7 +29,7 @@ class Entity:
     def entity_position(self):
         center = self.map.hex_to_screen(self.hexEntity)
 
-        position = np.array([center.q,center.r])+OFFSET
+        position = np.array([*center])+OFFSET
 
         return position
         
@@ -41,11 +41,11 @@ class Entity:
 
         i = getattr(CONST_direction, move_dir, None)
 
-        self.hexEntity = Hex(*move_to_tiles[i])
+        self.hexEntity = move_to_tiles[i]
 
         self.position = self.entity_position()
 
-        return [*move_to_tiles[i]]
+        return list(move_to_tiles[i])
     
     def hurt(self, vl):
         self.points -= vl

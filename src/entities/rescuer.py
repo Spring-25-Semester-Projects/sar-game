@@ -11,3 +11,6 @@ class Rescuer(Entity):
     
     def seek(self):
         return None # Path-finder later.
+
+    def __repr__(self):
+        return f"Entity={type(self).__name__}. Health={self.points}, Resources={self.resources}."

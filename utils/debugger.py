@@ -13,16 +13,14 @@ class Debugger:
 
     def get_entity_pos(self, direction):
         for entity in self.game.entities:
-            cube = [entity.hexEntity.x,entity.hexEntity.y,entity.hexEntity.z]
+            cube = [*entity.hexEntity]
+            name = type(entity).__name__
 
-            print(f"Entity {entity}:{cube}.\nNeighbors: {self.game.map.neighbor_hex(entity.hexEntity)}.\nEntity moved {direction}.")
+            print(f"{name}::{cube}.\nNeighbors: {self.game.map.neighbor_hex(entity.hexEntity)}.\n{name} moved {direction}.")
     
     def get_entity_stats(self):
         for entity in self.game.entities:
-            print(f"Entity {entity} stats. are:")
-
-            for stat in entity.stats:
-                print(f"{stat}.")
+            print(entity)
 
     def get_entity_feed(self, direction):
         self.get_entity_pos(direction)
@@ -35,12 +33,12 @@ class Debugger:
     def feed(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             cube = self.game.select_hex()
-            self.walk = self.game.map.walkable_hex_distance(self.game.entities.rescuer.hexEntity, Hex(cube.a,cube.b,cube.c))
+            self.walk = self.game.map.walkable_hex_distance(self.game.entities.rescuer.hexEntity, self.game.map.hexes[cube])
 
-            print(f"Hexagon at {{x: {cube.a}, y: {cube.b}, z: {cube.c}}} was clicked.")
+            print(f"Hexagon at {{x: {cube.x}, y: {cube.y}, z: {cube.z}}} was clicked.")
             print("Hexagons to walk:")
             for h in self.walk:
-                print(f"{h.x,h.y,h.z}.")
+                print(h)
 
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_RALT:
             self.toggleOverlay = not self.toggleOverlay
@@ -49,14 +47,14 @@ class Debugger:
             mouse_position = np.array(event.pos)-OFFSET
             pcube = self.game.map.screen_to_hex(mouse_position)
 
-            print(f"{{x: {pcube.a}, y: {pcube.b}, z: {pcube.c}.}}:{{x: {mouse_position[0]}, y: {mouse_position[1]}}}")  
+            print(f"{{x: {pcube.x}, y: {pcube.y}, z: {pcube.z}.}}::{{x: {mouse_position[0]}, y: {mouse_position[1]}}}")  
 
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_f and self.toggleOverlay:
             self.removeFog = not self.removeFog
 
             print("Hexagons visited:")
             for h in self.game.visited:
-                print(f"{h.x,h.y,h.z}.")
+                print(h)
 
     def overlay(self):
         if not self.toggleOverlay:

@@ -46,22 +46,21 @@ class Map:
         z = np.floor((np.floor((point[1] / self.radius) / scale) + np.floor(t2 - t1) + 2.0) / 3.0)
         x = np.floor((np.floor(t1 - t2) + np.floor(t1 + t2) + 2.0) / 3.0)
 
-        class Cube:
-            def __init__(self, a=0, b=0, c=0):
-                self.a, self.b, self.c = int(a), int(b), int(c)
-
-        return Cube(x,-x-z,z)
+        return self.hexes[Hex(int(x),int(-x-z),int(z))]
 
     def neighbor_hex(self, hex: Hex):
-        neighbors_matrix = (np.array([hex.x, hex.y, hex.z]) + CONST_unit_direction)
+        neighbors_matrix = (np.array([*hex]) + CONST_unit_direction)
+        for i,nb in enumerate(neighbors_matrix):
+            if not self.hexes[Hex(*nb)]:
+                neighbors_matrix[i] = None
 
-        return neighbors_matrix
+        return np.array([self.hexes[Hex(*nb)] for nb in neighbors_matrix], dtype=object)
     
     def hex_distance(self, h1 : Hex, h2 : Hex):
         return max(abs(h1.x - h2.x), abs(h1.y - h2.y), abs(h1.z - h2.z))
     
     def hex_round(self, hex: Hex):
-        fcube = np.array([hex.x, hex.y, hex.z])
+        fcube = np.array([*hex])
         cube = np.round(fcube)
 
         diff = np.abs(cube-fcube)
@@ -84,8 +83,8 @@ class Map:
 
         hexes_to_walk = []
         def interpol():
-            cube_h1 = np.array([h1.x,h1.y,h1.z])
-            cube_h2 = np.array([h2.x,h2.y,h2.z])
+            cube_h1 = np.array([*h1])
+            cube_h2 = np.array([*h2])
 
             for t in interpol_vl:
                 i = cube_h1 + ((cube_h2 - cube_h1) * t * (1/distance))
