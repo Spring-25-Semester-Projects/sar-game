@@ -1,8 +1,10 @@
 import numpy as np
-from hex import Hex, Center
+from src.hex import Hex, Center
 from config import WIDTH, HEIGHT, HEX_COLOR, SIZE, OFFSET
 
 CONST_unit_direction = np.array([[0, -1, 1], [1, -1, 0], [-1, 0, 1], [0, 1, -1], [1, 0, -1], [-1, 1, 0]])
+
+CONST_scale_matrix = np.array([[1,0],[0,(1.1)*(3/2)/(np.sqrt(3))]])
 
 CONST_flatTopped_matrix = np.array([[3/2, 0],[np.sqrt(3)/2, np.sqrt(3)]])
 
@@ -27,10 +29,13 @@ class Map:
         self.hexes = {}
         for q in range(min_x, max_x + 1):
             for r in range(min_z, max_z + 1):
-                s = -q-r
-                h = Hex(q, r, s)
+                px, py = (self.radius * (CONST_scale_matrix @ CONST_flatTopped_matrix @ np.array([q, r]))) + OFFSET
 
-                self.hexes[h] = h
+                if 0 <= px < WIDTH and 0 <= py < HEIGHT:
+                   s = -q-r
+                   h = Hex(q, r, s)
+
+                   self.hexes[h] = h
 
     def hex_to_screen(self, hex: Hex):
         hexagon_matrix = self.radius * (CONST_flatTopped_matrix @ np.array([hex.x, hex.z]))
@@ -50,11 +55,16 @@ class Map:
 
     def neighbor_hex(self, hex: Hex):
         neighbors_matrix = (np.array([*hex]) + CONST_unit_direction)
-        for i,nb in enumerate(neighbors_matrix):
-            if not self.hexes[Hex(*nb)]:
-                neighbors_matrix[i] = None
 
-        return np.array([self.hexes[Hex(*nb)] for nb in neighbors_matrix], dtype=object)
+        neighbors = list()
+
+        for nb in neighbors_matrix:
+            if not self.hexes.get(Hex(*nb)):
+                neighbors.append(None)
+            else:
+                neighbors.append(self.hexes[Hex(*nb)])
+
+        return np.array(neighbors, dtype=object)
     
     def hex_distance(self, h1 : Hex, h2 : Hex):
         return max(abs(h1.x - h2.x), abs(h1.y - h2.y), abs(h1.z - h2.z))
