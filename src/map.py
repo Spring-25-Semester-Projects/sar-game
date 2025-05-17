@@ -1,3 +1,4 @@
+from collections import namedtuple
 import numpy as np
 from src.hex import Hex, Center
 from config import WIDTH, HEIGHT, HEX_COLOR, SIZE, OFFSET
@@ -9,6 +10,9 @@ CONST_scale_matrix = np.array([[1,0],[0,(1.15)*(3/2)/(np.sqrt(3))]])
 CONST_flatTopped_matrix = np.array([[3/2, 0],[np.sqrt(3)/2, np.sqrt(3)]])
 
 CONST_screen_matrix = np.array([[0, 0],[WIDTH, 0],[0, HEIGHT],[WIDTH, HEIGHT]]) - OFFSET # Sceond term is to center.
+
+Costs = namedtuple('Cost', ['zero', 'one', 'two', 'three', 'four', 'block'])
+CONST_cost = tuple(Costs(zero=0, one=1, two=2, three=3, four=4, block=float('-inf')))
 
 class Map:
     def __init__(self, radius=SIZE):
@@ -104,6 +108,14 @@ class Map:
             return hexes_to_walk
 
         return interpol()
+    
+    def map_cost(self):
+        costs = {}
+        
+        for h in self.hexes.values():
+            costs[h] = CONST_cost[np.random.randint(0,6)]
+
+        return costs
 
     def draw_hex(self, hex: Hex):
         center = self.hex_to_screen(hex)
