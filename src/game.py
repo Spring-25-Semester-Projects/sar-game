@@ -5,9 +5,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from collections import deque, namedtuple
 import pygame
 import numpy as np
-from map import Map
-from entities.survivor import Survivor
-from entities.rescuer import Rescuer
+from src.map import Map
+from src.entities.survivor import Survivor
+from src.entities.rescuer import Rescuer
 from config import WIDTH, HEIGHT, FPS, DEBUG, SIZE, OFFSET
 
 if DEBUG:
@@ -80,8 +80,11 @@ class Game:
             
             dir = mapping.get(event.key)
             if dir:
-                self.entities.rescuer.move(dir)
+                moved = self.entities.rescuer.move(dir)
                 self.discover_hex()
+
+                if moved == None:
+                    dir = "nowhere"
 
                 if self.debugger:
                     self.debugger.get_entity_feed(dir)
@@ -119,13 +122,13 @@ class Game:
         if any(neighbor == h for neighbor in  self.map.neighbor_hex(self.entities.rescuer.hexEntity)):
             if color == (0,0,0):
                 color = (30,30,30)
+                border_color = (30,30,30)
 
         return color, border_color
             
     def draw_map(self):
-        border_color = (200,200,200)
-
         for h in self.map.hexes.values():
+                border_color = (50,50,50)
                 vertices, color = self.map.draw_hex(h)
 
                 color, border_color = self.fog(h,color,border_color)
