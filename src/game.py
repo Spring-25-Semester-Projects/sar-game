@@ -8,7 +8,7 @@ import numpy as np
 from src.map import Map
 from src.entities.survivor import Survivor
 from src.entities.rescuer import Rescuer
-from config import WIDTH, HEIGHT, FPS, DEBUG, SIZE, OFFSET
+from config import WIDTH, HEIGHT, FPS, DEBUG, SIZE, OFFSET, COST_COLORS
 
 if DEBUG:
     from utils.debugger import Debugger
@@ -39,8 +39,10 @@ class Game:
         self.running = True
         self.debugger = None
         self.removeFog = False
+        self.removeRed = False
         self.events_info = []
         self.map = Map(radius)
+        self.costs = self.map.map_cost()
         self.entities = Entities(Survivor(self.map), Rescuer(self.map))
         self.visited = deque([self.entities.rescuer.hexEntity])
 
@@ -125,11 +127,23 @@ class Game:
                 border_color = (30,30,30)
 
         return color, border_color
-            
+    
+    def color_me_red(self, cost, color):
+        if self.debugger.toggleOverlay and self.debugger.removeRed:
+            return color
+        elif self.debugger.toggleOverlay:
+            return COST_COLORS[(cost if cost != float('-inf') else 6)]
+        else:
+            return color
+
     def draw_map(self):
         for h in self.map.hexes.values():
                 border_color = (50,50,50)
+                cost = self.costs[h]
                 vertices, color = self.map.draw_hex(h)
+
+                if self.debugger:
+                    color = self.color_me_red(cost,color)
 
                 color, border_color = self.fog(h,color,border_color)
 
