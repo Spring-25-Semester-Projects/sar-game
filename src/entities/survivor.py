@@ -1,5 +1,5 @@
 import numpy as np
-from entities.mock_entity import *
+from src.entities.mock_entity import *
 
 class Survivor(Entity):
     def __init__(self, map):

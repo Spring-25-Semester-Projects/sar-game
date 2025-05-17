@@ -1,4 +1,4 @@
-from entities.mock_entity import *
+from src.entities.mock_entity import *
 
 class Rescuer(Entity):
     def __init__(self, map):
