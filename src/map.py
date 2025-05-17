@@ -4,7 +4,7 @@ from config import WIDTH, HEIGHT, HEX_COLOR, SIZE, OFFSET
 
 CONST_unit_direction = np.array([[0, -1, 1], [1, -1, 0], [-1, 0, 1], [0, 1, -1], [1, 0, -1], [-1, 1, 0]])
 
-CONST_scale_matrix = np.array([[1,0],[0,(1.1)*(3/2)/(np.sqrt(3))]])
+CONST_scale_matrix = np.array([[1,0],[0,(1.15)*(3/2)/(np.sqrt(3))]])
 
 CONST_flatTopped_matrix = np.array([[3/2, 0],[np.sqrt(3)/2, np.sqrt(3)]])
 
@@ -51,7 +51,7 @@ class Map:
         z = np.floor((np.floor((point[1] / self.radius) / scale) + np.floor(t2 - t1) + 2.0) / 3.0)
         x = np.floor((np.floor(t1 - t2) + np.floor(t1 + t2) + 2.0) / 3.0)
 
-        return self.hexes[Hex(int(x),int(-x-z),int(z))]
+        return self.hexes.get(Hex(int(x),int(-x-z),int(z)))
 
     def neighbor_hex(self, hex: Hex):
         neighbors_matrix = (np.array([*hex]) + CONST_unit_direction)
