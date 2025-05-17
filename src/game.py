@@ -1,63 +1,152 @@
 import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+ 
+from collections import deque, namedtuple
 import pygame
+import numpy as np
 from map import Map
-from entities.mock_entity import Entity
-from config import WIDTH, HEIGHT, FPS
+from entities.survivor import Survivor
+from entities.rescuer import Rescuer
+from config import WIDTH, HEIGHT, FPS, DEBUG, SIZE, OFFSET
 
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
+if DEBUG:
+    from utils.debugger import Debugger
+
+screen = pygame.display.set_mode((WIDTH,HEIGHT))
 pygame.display.set_caption("SAR Game")
 
-fav_icon = pygame.image.load("assets/imgs/fav.png")
+CONST_game_icon_path = "assets/imgs/fav.png"
+fav_icon = pygame.image.load(CONST_game_icon_path)
 pygame.display.set_icon(fav_icon)
 
-class Game:
-    def __init__(self, radius=30):
-        pygame.init()
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        self.clock = pygame.time.Clock()
-        self.running = True
-        self.map = Map(radius)
-        self.screen.fill((0, 0, 0))
+Entities = namedtuple('Entities', ['survivor','rescuer'])
 
-        # ! Later on, Suvivor or Rescuer stricly, defined outside.
-        self.entity = Entity(self.map)
+CONST_rescuer_character_path = "assets/Males/M_01.png"
+CONST_survivor_character_path = "assets/Females/F_01.png"
+
+rescuer_img = pygame.image.load(CONST_rescuer_character_path).convert_alpha()
+survivor_img = pygame.image.load(CONST_survivor_character_path).convert_alpha()
+
+class Game:
+    def __init__(self, radius=SIZE):
+        pygame.init()
+        self.screen = screen
+        self.size = radius
+        self.screen.fill((0, 0, 0))
+        self.clock = pygame.time.Clock()
+        self.font = pygame.font.SysFont(None, int(self.size*(2/3)))
+        self.running = True
+        self.debugger = None
+        self.removeFog = False
+        self.events_info = []
+        self.map = Map(radius)
+        self.entities = Entities(Survivor(self.map), Rescuer(self.map))
+        self.visited = deque([self.entities.rescuer.hexEntity])
+
+        if DEBUG:
+            self.debugger = Debugger(self, False)
+
+    def __get_cursor(self):
+        return np.array(pygame.mouse.get_pos())
+    
+    def select_hex(self):
+        point = self.__get_cursor() - OFFSET
+
+        cube = self.map.screen_to_hex(point)
+
+        return cube
+    
+    def discover_hex(self):
+        h = self.entities.rescuer.hexEntity
+        
+        if h in self.visited:
+            return None
+
+        self.visited.append(h)    
+
+    def handle_single_event(self, event):
+        if event.type == pygame.QUIT:
+            self.running = False
+            return None
+        
+        if event.type == pygame.KEYDOWN:
+            mapping = {
+                pygame.K_w: "NN",
+                pygame.K_e: "NE",
+                pygame.K_q: "NW",
+                pygame.K_s: "SS",
+                pygame.K_d: "SE",
+                pygame.K_a: "SW",
+            }
+            
+            dir = mapping.get(event.key)
+            if dir:
+                self.entities.rescuer.move(dir)
+                self.discover_hex()
+
+                if self.debugger:
+                    self.debugger.get_entity_feed(dir)
+    
+    def update_event_info(self):
+        for event in pygame.event.get():
+
+            if self.debugger:
+                self.debugger.feed(event)
+
+                self.debugger.get_event()
+
+            eventName = pygame.event.event_name(event.type)
+            eventInfo = [eventName, self.clock.get_time()]
+
+            if eventName == "KeyDown":
+                eventInfo.append(pygame.key.name(event.key))
+            elif eventName == "MouseButtonDown":
+                eventInfo.append(event.pos)
+
+            self.events_info.append(eventInfo)
+            self.handle_single_event(event)
 
     def handle_events(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                self.running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_w:
-                    self.entity.move("NN")
-                elif event.key == pygame.K_e:
-                    self.entity.move("NE")
-                elif event.key == pygame.K_q:
-                    self.entity.move("NW")
-                elif event.key == pygame.K_s:
-                    self.entity.move("SS")
-                elif event.key == pygame.K_d:
-                    self.entity.move("SE")
-                elif event.key == pygame.K_a:
-                    self.entity.move("SW")
-    
-    def draw_map(self, entity: Entity):
+        self.update_event_info()
+
+    def fog(self, h, color, border_color):
+        if self.debugger:
+            if self.debugger.toggleOverlay and self.debugger.removeFog:
+                return color, border_color
+
+        if not (h in self.visited):
+            border_color,color = (0,0,0),(0,0,0)
+
+        if np.any(np.all(self.map.neighbor_hex(self.entities.rescuer.hexEntity) == np.array([h.x,h.y,h.z]), axis=1)):
+            if color == (0,0,0):
+                color = (30,30,30)
+
+        return color, border_color
+            
+    def draw_map(self):
+        border_color = (200,200,200)
+
         for h in self.map.hexes.values():
-                vertices,color = self.map.draw_hex(h, entity.hexEntity)
+                vertices, color = self.map.draw_hex(h)
+
+                color, border_color = self.fog(h,color,border_color)
 
                 pygame.draw.polygon(self.screen, color, vertices)
-                pygame.draw.polygon(self.screen, (255, 255, 255), vertices, 1)
+                pygame.draw.polygon(self.screen, border_color, vertices, 1)
 
-    def spawn(self, entity: Entity):
-        pygame.draw.circle(self.screen, entity.color, entity.position, radius=20)
+    def spawn(self):
+        for entity in self.entities:
+            pygame.draw.circle(self.screen, entity.color, entity.position, radius=int(self.size*(3/5)))
 
     def run(self):
         while self.running:
             self.handle_events()
-            self.draw_map(self.entity)
-            self.spawn(self.entity)
+            self.draw_map()
+            self.spawn()
+
+            if self.debugger:
+                self.debugger.overlay()
 
             pygame.display.flip()
             self.clock.tick(FPS)

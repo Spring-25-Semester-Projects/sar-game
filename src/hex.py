@@ -6,6 +6,11 @@ class Hex:
     def __init__(self, x=0, y=0, z=0):
         self.x, self.y, self.z = x, y, z
 
+    def __eq__(self, other):
+        if not isinstance(other, Hex):
+            return NotImplemented
+        return (self.x, self.y, self.z) == (other.x, other.y, other.z)
+
     def __hash__(self):
         hq = hash(self.x)
         hr = hash(self.y)
