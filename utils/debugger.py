@@ -9,6 +9,7 @@ class Debugger:
         self.live = live
         self.walk = []
         self.removeFog = self.game.removeFog
+        self.removeRed = self.game.removeRed
         self.toggleOverlay = False
 
     def get_entity_pos(self, direction):
@@ -58,6 +59,8 @@ class Debugger:
             print("Hexagons visited:")
             for h in self.game.visited:
                 print(h)
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_c and self.toggleOverlay:
+            self.removeRed = not self.removeRed
 
     def overlay(self):
         if not self.toggleOverlay:
