@@ -1,18 +1,48 @@
 import numpy as np
-from hex import Hex, Center
+import random
 from config import WIDTH, HEIGHT, HEX_COLOR
 
-CONST_unit_direction = np.array([[0, -1, 1], [1, -1, 0], [-1, 0, 1], [0, 1, -1], [1, 0, -1], [-1, 1, 0]])
+CONST_unit_direction = np.array([[1, -1, 0],[1, 0, -1],[0, 1, -1],[-1, 1, 0],[-1, 0, 1],[0, -1, 1]])
 
 CONST_flatTopped_matrix = np.array([[3/2, 0],[np.sqrt(3)/2, np.sqrt(3)]])
 
-CONST_screen_matrix = np.array([[0, 0],[WIDTH, 0],[0, HEIGHT],[WIDTH, HEIGHT]]) - np.array([WIDTH/2,HEIGHT/2]) # Sceond term is to center.
+CONST_screen_matrix = np.array([[0, 0],[WIDTH, 0],[0, HEIGHT],[WIDTH, HEIGHT]]) - np.array([WIDTH/2,HEIGHT/2]) # Second term is to center.
+
+class Center:
+    def __init__(self, q=0, r=0):
+        self.q, self.r = q, r
+
+class Hex:
+    def __init__(self, x=0, y=0, z=0, terrain_type='normal'):
+        self.x, self.y, self.z = x, y, z
+        self.terrain_type = terrain_type
+        self.cost = self._get_terrain_cost()
+    
+    def _get_terrain_cost(self):
+        costs = {
+            'plain': 1,
+            'forest': 3,
+            'mountain': 6,
+            'water': float('inf'),
+            'normal': 1
+        }
+        return costs.get(self.terrain_type, 1)
+    
+    def __hash__(self):
+        hq = hash(self.x)
+        hr = hash(self.y)
+        return hq ^ (hr + 0x9e3779b9 + ((hq << 6) & 0xFFFFFFFFFFFFFFFF) + (hq >> 2))
+    
+    def __eq__(self, other):
+        if not isinstance(other, Hex):
+            return False
+        return self.x == other.x and self.y == other.y and self.z == other.z
 
 class Map(Hex):
     def __init__(self, radius=10):
         self.radius = radius
 
-        # This long variable just turns the pixel coord.’s to hex coord. (for screen), so it knows where the tile boundary is.
+        # Convert screen coordinates to hex coordinates
         screen_to_hex_matrix = np.array([np.linalg.inv(self.radius * CONST_flatTopped_matrix) @ ar for ar in CONST_screen_matrix]) 
 
         min_screenHex = np.floor(np.min(screen_to_hex_matrix, axis=0))-2
@@ -24,13 +54,22 @@ class Map(Hex):
         for q in range(min_x, max_x + 1):
             for r in range(min_z, max_z + 1):
                 s = -q-r
-                h = Hex(q, r, s)
-
+                # Generate terrain type with probabilities
+                rand = random.random()
+                if rand < 0.05:  # 5% water
+                    terrain = 'water'
+                elif rand < 0.15:  # 10% mountains (5-15%)
+                    terrain = 'mountain'
+                elif rand < 0.55:  # 40% forest (15-55%)
+                    terrain = 'forest'
+                else:  # 45% plain (55-100%)
+                    terrain = 'plain'
+                
+                h = Hex(q, r, s, terrain)
                 self.hexes[h] = h
 
     def hex_to_screen(self, hex: Hex):
         hexagon_matrix = self.radius * (CONST_flatTopped_matrix @ np.array([hex.x, hex.z]))
-
         return Center(*hexagon_matrix)
     
     def screen_to_hex(self, hex: Hex):
@@ -50,30 +89,33 @@ class Map(Hex):
     
     def neighbor_hex(self, hex: Hex):
         neighbors_matrix = (np.array([hex.x, hex.y, hex.z]) + CONST_unit_direction)
-
         return neighbors_matrix
     
     def draw_hex(self, hex: Hex, entityHex=None):
         center = self.hex_to_screen(hex)
 
         vertices = []
-        color = HEX_COLOR
+        # Set color based on terrain type
+        terrain_colors = {
+            'plain': (175, 225, 175),    # AFE1AF - Light green
+            'forest': (34, 139, 34),     # 228B22 - Forest green
+            'mountain': (72, 60, 50),    # 483C32 - Dark brown
+            'water': (137, 207, 240),    # 89CFF0 - Light blue
+            'normal': (100, 100, 100)    # Default gray
+        }
+        color = terrain_colors.get(hex.terrain_type, terrain_colors['normal'])
 
         if entityHex is not None:
             neighbors = self.neighbor_hex(entityHex)
-
             for hex_nb in neighbors:
                 if np.array_equal([hex.x, hex.y, hex.z], hex_nb):
-                    color = (231, 76, 60)
-
+                    color = (231, 76, 60)  # Highlight color for adjacent hexes
                     break
 
         for i in range(6):
             angle = np.radians(60 * i)
-
             x = center.q + (self.radius * np.cos(angle))
             y = center.r + (self.radius * np.sin(angle))
-
-            vertices.append([x + WIDTH/2,y + HEIGHT/2])
+            vertices.append([x + WIDTH/2, y + HEIGHT/2])
 
         return vertices, color
