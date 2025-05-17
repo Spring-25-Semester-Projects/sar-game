@@ -33,12 +33,14 @@ class Debugger:
     def feed(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             cube = self.game.select_hex()
-            self.walk = self.game.map.walkable_hex_distance(self.game.entities.rescuer.hexEntity, self.game.map.hexes[cube])
+            
+            if cube:
+                self.walk = self.game.map.walkable_hex_distance(self.game.entities.rescuer.hexEntity, self.game.map.hexes[cube])
 
-            print(f"Hexagon at {{x: {cube.x}, y: {cube.y}, z: {cube.z}}} was clicked.")
-            print("Hexagons to walk:")
-            for h in self.walk:
-                print(h)
+                print(f"Hexagon at {{x: {cube.x}, y: {cube.y}, z: {cube.z}}} was clicked.")
+                print("Hexagons to walk:")
+                for h in self.walk:
+                    print(h)
 
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_RALT:
             self.toggleOverlay = not self.toggleOverlay
@@ -47,7 +49,8 @@ class Debugger:
             mouse_position = np.array(event.pos)-OFFSET
             pcube = self.game.map.screen_to_hex(mouse_position)
 
-            print(f"{{x: {pcube.x}, y: {pcube.y}, z: {pcube.z}.}}::{{x: {mouse_position[0]}, y: {mouse_position[1]}}}")  
+            if pcube:
+                print(f"{{x: {pcube.x}, y: {pcube.y}, z: {pcube.z}.}}::{{x: {mouse_position[0]}, y: {mouse_position[1]}}}")  
 
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_f and self.toggleOverlay:
             self.removeFog = not self.removeFog
@@ -70,7 +73,12 @@ class Debugger:
 
         for entity in self.game.entities:
             for nb in self.game.map.neighbor_hex(entity.hexEntity):
+                
+                if nb == None:
+                    break
+
                 h = Hex(*nb)
+
                 vertices = self.game.map.draw_hex(h)[0]
                 color = (231, 76, 60)
 
