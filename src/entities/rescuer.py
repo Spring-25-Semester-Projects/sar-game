@@ -1,4 +1,4 @@
-from src.entities.mock_entity import *
+from src.entities.mock_entity import Entity, Hex
 from collections import defaultdict, Counter
 import heapq
 import random
@@ -7,20 +7,8 @@ import time
 
 class Rescuer(Entity):
     def __init__(self, map):
-        super().__init__(map)
-
-        sprite_img = pygame.image.load("sar-game-8-field-of-view/assets/Females/F_03.png").convert_alpha()
-        self.sprite_sheet = SpriteSheet(sprite_img)
-        self.animation_list = []
-        self.animation_steps = 3  # Using only 3 front-facing frames
-        self.frame = 0
-        self.last_update = pygame.time.get_ticks()
-        self.animation_cooldown = 200
-
-        # Initialize animation frames - use the front-facing frames only
-        for x in range(self.animation_steps):
-            self.animation_list.append(self.sprite_sheet.get_img(x, 17, 17, 2.75, (0, 0, 0)))
-
+        # Call parent constructor with the specific sprite path
+        super().__init__(map, sprite_path="sar-game-8-field-of-view/assets/Females/F_03.png")
 
         self.resources = float('inf')  # Set to a reasonable initial value 
         self.stats = [self.points, self.resources]
