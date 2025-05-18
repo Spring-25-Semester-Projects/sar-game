@@ -32,29 +32,45 @@ class SpriteSheet:
         return image
 
 class Entity:
-    def __init__(self, map: Map, sprite_path="sar-game-8-field-of-view/assets/Females/F_02.png", color=ENTITY_COLOR):
+    def __init__(self, map: Map, sprite_path=None, color=ENTITY_COLOR):
         self.map = map
         self.hexEntity = self.map.hexes[Hex()]
         self.color = color
-        self.points = 100
+        self.points = float('inf')
         self.position = self.entity_position()
         
         # Sprite properties
-        self.init_sprite_animation(sprite_path)
+        if sprite_path:
+            self.init_sprite_animation(sprite_path)
+        else:
+            # Create default animation list with a placeholder
+            self.animation_list = [pygame.Surface((17 * 2.75, 17 * 2.75))]
+            self.animation_list[0].fill(self.color)
+            self.frame = 0
+            self.last_update = pygame.time.get_ticks()
+            self.animation_cooldown = 200
         
     def init_sprite_animation(self, sprite_path):
         """Initialize sprite animation properties"""
-        sprite_img = pygame.image.load(sprite_path).convert_alpha()
-        self.sprite_sheet = SpriteSheet(sprite_img)
-        self.animation_list = []
-        self.animation_steps = 3  # Using only 3 front-facing frames
-        self.frame = 0
-        self.last_update = pygame.time.get_ticks()
-        self.animation_cooldown = 200
-        
-        # Initialize animation frames - use the front-facing frames only
-        for x in range(self.animation_steps):
-            self.animation_list.append(self.sprite_sheet.get_img(x, 17, 17, 2.75, (0, 0, 0)))
+        try:
+            sprite_img = pygame.image.load(sprite_path).convert_alpha()
+            self.sprite_sheet = SpriteSheet(sprite_img)
+            self.animation_list = []
+            self.animation_steps = 3  # Using only 3 front-facing frames
+            self.frame = 0
+            self.last_update = pygame.time.get_ticks()
+            self.animation_cooldown = 200
+            
+            # Initialize animation frames - use the front-facing frames only
+            for x in range(self.animation_steps):
+                self.animation_list.append(self.sprite_sheet.get_img(x, 17, 17, 2.75, (0, 0, 0)))
+        except Exception as e:
+            print(f"Error loading sprite from {sprite_path}: {e}")
+            # Create placeholder animation list with a colored rectangle
+            self.animation_list = [pygame.Surface((17 * 2.75, 17 * 2.75))]
+            self.animation_list[0].fill(self.color)
+            self.frame = 0
+            self.animation_steps = 1
         
     def entity_position(self):
         center = self.map.hex_to_screen(self.hexEntity)
@@ -86,6 +102,9 @@ class Entity:
         
     def update_animation(self, force=False):
         """Updates animation frame based on cooldown timer"""
+        if not hasattr(self, 'animation_steps') or self.animation_steps <= 1:
+            return
+            
         current_time = pygame.time.get_ticks()
         if force or current_time - self.last_update >= self.animation_cooldown:
             self.frame = (self.frame + 1) % self.animation_steps
