@@ -1,16 +1,20 @@
 from src.entities.mock_entity import Entity, Hex
 from collections import defaultdict, Counter
+from config import CONST_RESCUER_SPRITE_PATH
+from src.hex import Hex
 import heapq
 import random
 import numpy as np
 import time
 
+
+
 class Rescuer(Entity):
     def __init__(self, map):
         # Call parent constructor with the specific sprite path
-        super().__init__(map, sprite_path="sar-game-8-field-of-view/assets/Females/F_03.png")
+        super().__init__(map, sprite_path=CONST_RESCUER_SPRITE_PATH)
 
-        self.resources = float('inf')  # Set to a reasonable initial value 
+        self.resources = float('inf') # Set to a reasonable initial value 
         self.stats = [self.points, self.resources]
         self.inventory = {}
         self.target_path = []
@@ -23,6 +27,15 @@ class Rescuer(Entity):
         self.last_exploration_time = time.time()  # Time tracking for exploration
         self.stuck_threshold = 3      # How many repeated visits before considering "stuck"
         self.exploration_boost = 1.0  # Dynamic exploration boost (increases when stuck)
+        
+        # Naive Bayes variables for survivor movement prediction
+        self.survivor_move_history = []  # Track survivor's recent movements
+        self.survivor_position_history = []  # Track survivor's positions
+        self.survivor_last_seen_position = None
+        self.survivor_last_seen_time = 0  # Track when survivor was last spotted
+        self.survivor_direction_counts = Counter()  # Count movement directions
+        self.survivor_terrain_prefs = defaultdict(Counter)  # Terrain preferences by cost
+        self.laplace_smoothing = 1.0  # Smoothing factor for Naive Bayes
         
     def replinsh(self, vl):
         self.resources += vl
@@ -115,21 +128,142 @@ class Rescuer(Entity):
             
         return 0
     
+    def update_survivor_model(self, current_survivor_pos):
+        """Update the Naive Bayes model with new survivor observation"""
+        # Only update if we have valid data
+        if current_survivor_pos is None:
+            return
+            
+        # If this is the first observation
+        if self.survivor_last_seen_position is None:
+            self.survivor_last_seen_position = current_survivor_pos
+            self.survivor_position_history.append(current_survivor_pos)
+            self.survivor_last_seen_time = time.time()
+            return
+            
+        # Only update if the position has changed (movement occurred)
+        if current_survivor_pos != self.survivor_last_seen_position:
+            # Determine which direction the survivor moved
+            neighbors = self.map.neighbor_hex(self.survivor_last_seen_position)
+            for i, neighbor in enumerate(neighbors):
+                if neighbor == current_survivor_pos:
+                    directions = ["SS", "SE", "SW", "NN", "NE", "NW"]
+                    moved_direction = directions[i]
+                    self.survivor_direction_counts[moved_direction] += 1
+                    self.survivor_move_history.append(moved_direction)
+                    
+                    # Update terrain preference (if costs are available)
+                    if self.costs and current_survivor_pos in self.costs:
+                        cost = self.costs[current_survivor_pos]
+                        if cost != float('-inf'):  # Don't count blocked tiles
+                            self.survivor_terrain_prefs[moved_direction][cost] += 1
+                    
+                    # Limit history size
+                    if len(self.survivor_move_history) > 20:
+                        self.survivor_move_history.pop(0)
+                    break
+            
+            # Update position history
+            self.survivor_position_history.append(current_survivor_pos)
+            if len(self.survivor_position_history) > 20:
+                self.survivor_position_history.pop(0)
+                
+            # Update last seen data
+            self.survivor_last_seen_position = current_survivor_pos
+            self.survivor_last_seen_time = time.time()
+    
+    def predict_survivor_movement_probs(self, current_pos, valid_moves):
+        """
+        Use Naive Bayes to predict the probabilities of the survivor's next movement.
+        Returns a dictionary mapping each possible move to its probability.
+        """
+        # If we have no history, use uniform distribution
+        if not self.survivor_move_history:
+            # Equal probability for all valid moves including staying
+            num_options = len(valid_moves) + 1  # +1 for staying in place
+            stay_prob = 1.0 / num_options
+            move_prob = 1.0 / num_options
+            
+            probs = {current_pos: stay_prob}
+            for move in valid_moves:
+                if move != current_pos:  # Avoid double counting staying in place
+                    probs[move] = move_prob
+            return probs
+        
+        # Calculate prior probabilities based on movement history
+        total_moves = sum(self.survivor_direction_counts.values()) + len(self.survivor_direction_counts) * self.laplace_smoothing
+        
+        # Initialize uniform probabilities first (fallback)
+        probs = {}
+        
+        # Process each possible move
+        neighbors = self.map.neighbor_hex(current_pos)
+        directions = ["SS", "SE", "SW", "NN", "NE", "NW"]
+        
+        # First calculate raw probabilities based on direction history
+        raw_probs = {}
+        for i, neighbor in enumerate(neighbors):
+            if neighbor is None or neighbor not in valid_moves:
+                continue
+                
+            direction = directions[i]
+            
+            # Get direction probability (with Laplace smoothing)
+            dir_count = self.survivor_direction_counts[direction] + self.laplace_smoothing
+            dir_prob = dir_count / total_moves
+            
+            # Get terrain preference probability if we have data
+            terrain_prob = 1.0
+            if self.costs and neighbor in self.costs:
+                cost = self.costs[neighbor]
+                if cost != float('-inf'):
+                    # Calculate how often survivor chose this cost for this direction
+                    cost_count = self.survivor_terrain_prefs[direction][cost] + self.laplace_smoothing
+                    total_cost_counts = sum(self.survivor_terrain_prefs[direction].values()) + \
+                                     len(self.survivor_terrain_prefs[direction]) * self.laplace_smoothing
+                    if total_cost_counts > 0:
+                        terrain_prob = cost_count / total_cost_counts
+            
+            # Combined probability using Naive Bayes (direction and terrain are independent features)
+            raw_probs[neighbor] = dir_prob * terrain_prob
+        
+        # Calculate staying probability - inverse correlation with movement activity
+        # More movement history = less likely to stay still
+        move_activity = min(0.9, len(self.survivor_move_history) / 20)  # Cap at 90%
+        stay_prob = 1.0 - move_activity
+        raw_probs[current_pos] = stay_prob
+        
+        # Normalize probabilities
+        total_prob = sum(raw_probs.values())
+        if total_prob > 0:
+            for pos, prob in raw_probs.items():
+                probs[pos] = prob / total_prob
+        else:
+            # Fallback to uniform if calculations failed
+            even_prob = 1.0 / len(raw_probs)
+            for pos in raw_probs:
+                probs[pos] = even_prob
+                
+        return probs
+    
     def expectimax_decision(self, survivor_hex, visited_hexes, costs):
         """
         Enhanced expectimax approach that accounts for survivor's possible movements.
         - Considers the cost of each path
-        - Takes into account the probability of the survivor moving
+        - Uses Naive Bayes to predict survivor movement
         - Evaluates multiple possible future states
         - Now includes anti-loop protection
         """
+        # Update the survivor model with current observation
+        self.update_survivor_model(survivor_hex)
+        
         # Increase exploration boost over time when no new tiles visited
         current_time = time.time()
         time_since_last_exploration = current_time - self.last_exploration_time
         
         # If we're getting stuck in loops, increase the exploration boost
-        if time_since_last_exploration > 5.0:  # 5 seconds without finding new tiles
-            self.exploration_boost = min(5.0, self.exploration_boost + 0.5)
+        if time_since_last_exploration > 3.0:  # 5 seconds without finding new tiles
+            self.exploration_boost = min(3.0, self.exploration_boost + 0.5)
         else:
             self.exploration_boost = max(1.0, self.exploration_boost - 0.1)  # Slowly decrease back to normal
             
@@ -188,7 +322,7 @@ class Rescuer(Entity):
     
     def _expectimax_score(self, rescuer_pos, survivor_pos, costs, depth, max_depth, visited_hexes):
         """
-        Recursive helper function for expectimax calculation.
+        Recursive helper function for expectimax calculation with Naive Bayes probabilities.
         
         Args:
             rescuer_pos: The rescuer's position
@@ -236,7 +370,7 @@ class Rescuer(Entity):
                 
             return best_score
         
-        # Survivor's turn (chance node)
+        # Survivor's turn (chance node) - Now using Naive Bayes probabilities
         else:
             # Get possible moves for survivor
             neighbors = self.map.neighbor_hex(survivor_pos)
@@ -245,20 +379,16 @@ class Rescuer(Entity):
             if not valid_moves:
                 valid_moves = [survivor_pos]  # Survivor stays in place if no valid moves
             
+            # Calculate movement probabilities using Naive Bayes
+            valid_moves.append(survivor_pos)  # Include staying in place as an option
+            move_probs = self.predict_survivor_movement_probs(survivor_pos, valid_moves)
+            
             # Calculate expected value across all possible survivor moves
-            # Assume survivor has 75% chance to move randomly and 25% chance to stay still
             total_score = 0
             
-            # Score for staying still (25% chance)
-            stay_score = self._expectimax_score(rescuer_pos, survivor_pos, costs, depth + 1, max_depth, visited_hexes)
-            total_score += 0.25 * stay_score
-            
-            # Score for random movement (75% chance distributed among valid moves)
-            move_probability = 0.75 / len(valid_moves) if valid_moves else 0
-            for move in valid_moves:
-                if move != survivor_pos:  # Skip the case where survivor stays still (already calculated)
-                    score = self._expectimax_score(rescuer_pos, move, costs, depth + 1, max_depth, visited_hexes)
-                    total_score += move_probability * score
+            for move, probability in move_probs.items():
+                score = self._expectimax_score(rescuer_pos, move, costs, depth + 1, max_depth, visited_hexes)
+                total_score += probability * score
             
             return total_score
     
@@ -391,6 +521,3 @@ class Rescuer(Entity):
             
             return True
         return False
-
-    def __repr__(self):
-        return f"Entity={type(self).__name__}. Health={self.points}, Resources={self.resources}."
