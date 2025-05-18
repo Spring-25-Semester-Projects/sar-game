@@ -13,7 +13,11 @@ COST_COLORS = [(220, 20, 60), (178, 34, 34), (205, 92, 92), (255, 99, 71), (139,
 
 OFFSET = np.array([WIDTH/2, HEIGHT/2])
 
-SIZE = 38
+SIZE = 24
+
+
+CONST_RESCUER_SPRITE_PATH = "sar-game-8-field-of-view/assets/Females/F_03.png"
+CONST_SURVIVOR_SPRITE_PATH = "sar-game-8-field-of-view/assets/Males/M_04.png"
 
 load_dotenv()
 DEBUG = os.getenv("DEBUG")
