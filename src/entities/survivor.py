@@ -1,10 +1,14 @@
 import numpy as np
+from config import CONST_SURVIVOR_SPRITE_PATH
 from src.entities.mock_entity import Entity, Hex
+
+
+
 
 class Survivor(Entity):
     def __init__(self, map):
         # Call parent constructor with the specific sprite path
-        super().__init__(map, sprite_path="sar-game-8-field-of-view/assets/Females/F_10.png")
+        super().__init__(map, sprite_path=CONST_SURVIVOR_SPRITE_PATH)
 
         # ! THIS IS ONLY FOR TESTING, DEFAULT SPAWN POSITION IS BASED ON SEED
         self.hexEntity = map.hexes[Hex(-12,6,6)]
