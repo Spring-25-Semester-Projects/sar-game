@@ -32,7 +32,7 @@ class SpriteSheet:
         return image
 
 class Entity:
-    def __init__(self, map: Map, color=ENTITY_COLOR):
+    def __init__(self, map: Map, sprite_path="sar-game-8-field-of-view/assets/Females/F_02.png", color=ENTITY_COLOR):
         self.map = map
         self.hexEntity = self.map.hexes[Hex()]
         self.color = color
@@ -40,7 +40,11 @@ class Entity:
         self.position = self.entity_position()
         
         # Sprite properties
-        sprite_img = pygame.image.load("sar-game-8-field-of-view/assets/Females/F_02.png").convert_alpha()
+        self.init_sprite_animation(sprite_path)
+        
+    def init_sprite_animation(self, sprite_path):
+        """Initialize sprite animation properties"""
+        sprite_img = pygame.image.load(sprite_path).convert_alpha()
         self.sprite_sheet = SpriteSheet(sprite_img)
         self.animation_list = []
         self.animation_steps = 3  # Using only 3 front-facing frames
@@ -72,10 +76,7 @@ class Entity:
         self.position = self.entity_position()
         
         # Update animation frame when moving
-        current_time = pygame.time.get_ticks()
-        if current_time - self.last_update >= self.animation_cooldown:
-            self.frame = (self.frame + 1) % self.animation_steps
-            self.last_update = current_time
+        self.update_animation(force=True)
 
         return list(move_to_tiles[dir_attr])
     
@@ -83,9 +84,9 @@ class Entity:
         self.points -= vl
         return self.points
         
-    def update_animation(self):
+    def update_animation(self, force=False):
         """Updates animation frame based on cooldown timer"""
         current_time = pygame.time.get_ticks()
-        if current_time - self.last_update >= self.animation_cooldown:
+        if force or current_time - self.last_update >= self.animation_cooldown:
             self.frame = (self.frame + 1) % self.animation_steps
             self.last_update = current_time
