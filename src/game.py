@@ -9,6 +9,7 @@ import time
 from src.map import Map
 from src.entities.survivor import Survivor
 from src.entities.rescuer import Rescuer
+from crypto_system import MessageManager  # Import the crypto system
 from config import WIDTH, HEIGHT, FPS, DEBUG, SIZE, OFFSET, COST_COLORS
 
 if DEBUG:
@@ -23,12 +24,6 @@ pygame.display.set_icon(fav_icon)
 
 Entities = namedtuple('Entities', ['survivor','rescuer'])
 
-CONST_rescuer_character_path = "sar-game-8-field-of-view/assets/Females/F_03.png"
-CONST_survivor_character_path = "sar-game-8-field-of-view/assets/Females/F_10.png"
-
-rescuer_img = pygame.image.load(CONST_rescuer_character_path).convert_alpha()
-survivor_img = pygame.image.load(CONST_survivor_character_path).convert_alpha()
-
 class Game:
     def __init__(self, radius=SIZE):
         pygame.init()
@@ -36,8 +31,10 @@ class Game:
         self.size = radius
         self.screen.fill((0, 0, 0))
         self.clock = pygame.time.Clock()
-        # Increased font size
-        self.font = pygame.font.SysFont(None, int(self.size * 1.0))  
+        
+        # Create different font sizes for various UI elements
+        self.create_fonts()
+        
         self.running = True
         self.debugger = None
         self.removeFog = False
@@ -48,8 +45,14 @@ class Game:
         self.entities = Entities(Survivor(self.map), Rescuer(self.map))
         self.visited = deque([self.entities.rescuer.hexEntity])
         
+        # Initialize the crypto message system
+        self.message_manager = MessageManager(self.map)
+        
         # Pass costs to the rescuer for more informed decision making
         self.entities.rescuer.costs = self.costs
+        
+        # Set fair amount of resources for rescuer (200 instead of infinite)
+        #self.entities.rescuer.resources = 200
         
         self.rescuer_moved = False
         self.ai_mode = False  # Toggle for AI control
@@ -83,6 +86,14 @@ class Game:
         if DEBUG:
             self.debugger = Debugger(self, False)
 
+    def create_fonts(self):
+        """Create different font sizes for various UI elements"""
+        self.title_font = pygame.font.SysFont(None, int(self.size * 1.5))  # Larger font for titles
+        self.info_font = pygame.font.SysFont(None, int(self.size * 1.0))   # Medium font for game info
+        self.cost_font = pygame.font.SysFont(None, int(self.size * 1.0))   # Original font for costs
+        self.result_font = pygame.font.SysFont(None, int(self.size * 3.0)) # Large font for win/lose messages
+        self.help_font = pygame.font.SysFont(None, int(self.size * 0.9))   # Smaller font for help text
+
     def __get_cursor(self):
         return np.array(pygame.mouse.get_pos())
     
@@ -90,7 +101,7 @@ class Game:
         point = self.__get_cursor() - OFFSET
 
         return self.map.screen_to_hex(point)
-    
+        
     def discover_hex(self):
         h = self.entities.rescuer.hexEntity
         
@@ -98,6 +109,12 @@ class Game:
             return None
 
         self.visited.append(h)
+        
+        # Only check for messages when discovering a new hex
+        found_message = self.message_manager.check_for_message(h)
+        if found_message:
+            print(f"Found encrypted message at {h}! Decrypting...")
+            
         
     def check_win_condition(self):
         """Check if rescuer has found survivor"""
@@ -118,7 +135,8 @@ class Game:
         return False
     
     def check_lose_condition(self):
-        """Check if resources are depleted"""
+        """Check if resources are depleted or survivor's health reaches 0"""
+        # Check rescuer resources
         if self.entities.rescuer.resources <= 0:
             if not self.game_over:  # Only print and update stats once
                 print("Out of resources! Game over!")
@@ -129,6 +147,19 @@ class Game:
                 if self.search_start_time is not None:
                     self.total_search_time = time.time() - self.search_start_time
             return True
+            
+        # Check survivor health
+        if self.entities.survivor.points <= 0:
+            if not self.game_over:  # Only print and update stats once
+                print("Survivor died! Game over!")
+                self.game_over = True
+                self.total_games += 1
+                
+                # Only calculate search time if AI mode was used
+                if self.search_start_time is not None:
+                    self.total_search_time = time.time() - self.search_start_time
+            return True
+            
         return False
     
     def can_see_survivor(self):
@@ -186,6 +217,17 @@ class Game:
             # If they're starting in the same hex, immediate success
             self.success_rate = 100
     
+    def survivor_takes_tile_damage(self):
+        """Survivor takes damage based on the cost of the tile they're standing on"""
+        survivor_hex = self.entities.survivor.hexEntity
+        tile_cost = self.costs[survivor_hex]
+        
+        # If the tile has a valid cost (not blocked), apply damage
+        if tile_cost != float('-inf'):
+            damage = tile_cost
+            self.entities.survivor.points = max(0, self.entities.survivor.points - damage)
+            print(f"Survivor took {damage} damage from terrain. Health: {self.entities.survivor.points}")
+    
     def ai_move(self):
         """Let AI control the rescuer with fog of war constraints"""
         if self.ai_mode and not self.game_over:
@@ -197,6 +239,26 @@ class Game:
             if not self.rescuer_moved:
                 # Update survivor tracking information
                 self.update_survivor_tracking()
+                
+                # Check if rescuer can see survivor (adjacent check)
+                rescuer_hex = self.entities.rescuer.hexEntity
+                survivor_hex = self.entities.survivor.hexEntity
+                
+                # If survivor is adjacent, move directly to them (simplified pathfinding)
+                if survivor_hex in self.map.neighbor_hex(rescuer_hex):
+                    # Find the direction to the survivor
+                    neighbors = self.map.neighbor_hex(rescuer_hex)
+                    for i, neighbor in enumerate(neighbors):
+                        if neighbor == survivor_hex:
+                            directions = ["SS", "SE", "SW", "NN", "NE", "NW"]
+                            direction = directions[i]
+                            self.entities.rescuer.move(direction)
+                            self.discover_hex()
+                            self.rescuer_moved = True
+                            self.steps_taken += 1
+                            self.move_survivor_randomly()
+                            self.update_success_rate()
+                            return
                 
                 # Measure the AI move time
                 ai_move_start = time.time()
@@ -288,12 +350,18 @@ class Game:
                     self.debugger.get_entity_feed(dir)
     
     def move_survivor_randomly(self):
+        """Move survivor randomly and apply tile damage"""
         if np.random.random() < 0.75:
             random_dir_index = np.random.randint(0, 6)
             directions = ["NN", "NE", "NW", "SS", "SE", "SW"]
             random_dir = directions[random_dir_index]
             
-            self.entities.survivor.move(random_dir)
+            # Move the survivor
+            moved = self.entities.survivor.move(random_dir)
+            
+            # If the survivor successfully moved, apply tile damage
+            if moved is not None:
+                self.survivor_takes_tile_damage()
     
     def update_event_info(self):
         for event in pygame.event.get():
@@ -381,24 +449,36 @@ class Game:
                 # Display cost values for DEBUG
                 if self.debugger and self.debugger.toggleOverlay and cost != float('-inf'):
                     center = self.map.hex_to_screen(h)
-                    cost_text = self.font.render(str(cost), True, (255, 255, 255))
+                    cost_text = self.cost_font.render(str(cost), True, (255, 255, 255))
                     text_rect = cost_text.get_rect(center=(center.q + OFFSET[0], center.r + OFFSET[1]))
                     self.screen.blit(cost_text, text_rect)
 
     def draw_game_info(self):
         """Display game information like resources and steps"""
         # Vertical spacing between lines
-        line_height = 35
+        line_height = 30
         
         # Resources text
         resources_text = f"Resources: {self.entities.rescuer.resources}"
-        text_surface = self.font.render(resources_text, True, (255, 255, 255))
+        text_surface = self.info_font.render(resources_text, True, (255, 255, 255))
         self.screen.blit(text_surface, (10, 10))
+        
+        # Survivor health text
+        health_text = f"Survivor Health: {self.entities.survivor.points}"
+        health_surface = self.info_font.render(health_text, True, (255, 255, 255))
+        self.screen.blit(health_surface, (10, 10 + line_height))
         
         # Steps text
         steps_text = f"Steps: {self.steps_taken}"
-        steps_surface = self.font.render(steps_text, True, (255, 255, 255))
-        self.screen.blit(steps_surface, (10, 10 + line_height))
+        steps_surface = self.info_font.render(steps_text, True, (255, 255, 255))
+        self.screen.blit(steps_surface, (10, 10 + 2 * line_height))
+        
+        # Message progress
+        found_count = self.message_manager.get_found_count()
+        decrypted_count = self.message_manager.get_decrypted_count()
+        message_text = f"Messages: {found_count}/5 found, {decrypted_count}/5 decrypted"
+        message_surface = self.info_font.render(message_text, True, (255, 255, 255))
+        self.screen.blit(message_surface, (10, 10 + 3 * line_height))
         
         # Search time (formatted to 2 decimal places)
         if self.ai_mode and self.search_start_time is not None and not self.game_over:
@@ -408,19 +488,19 @@ class Game:
             time_text = f"Search Time: {self.total_search_time:.2f}s"
         else:
             time_text = "Search Time: 0.00s"
-        time_surface = self.font.render(time_text, True, (255, 255, 255))
-        self.screen.blit(time_surface, (10, 10 + 2 * line_height))
+        time_surface = self.info_font.render(time_text, True, (255, 255, 255))
+        self.screen.blit(time_surface, (10, 10 + 4 * line_height))
         
         # Success rate based on proximity to target
         rate_text = f"Success Rate: {self.success_rate:.1f}%"
-        rate_surface = self.font.render(rate_text, True, (255, 255, 255))
-        self.screen.blit(rate_surface, (10, 10 + 3 * line_height))
+        rate_surface = self.info_font.render(rate_text, True, (255, 255, 255))
+        self.screen.blit(rate_surface, (10, 10 + 5 * line_height))
         
         # AI mode indicator
         if self.ai_mode:
             ai_text = "AI Mode: ON"
-            ai_surface = self.font.render(ai_text, True, (100, 255, 100))
-            self.screen.blit(ai_surface, (10, 10 + 4 * line_height))
+            ai_surface = self.info_font.render(ai_text, True, (100, 255, 100))
+            self.screen.blit(ai_surface, (10, 10 + 6 * line_height))
             
             # Display survivor tracking status
             if self.survivor_spotted:
@@ -433,27 +513,43 @@ class Game:
                 tracking_text = "Survivor: UNKNOWN"
                 tracking_color = (255, 0, 0)
                 
-            tracking_surface = self.font.render(tracking_text, True, tracking_color)
-            self.screen.blit(tracking_surface, (10, 10 + 5 * line_height))
+            tracking_surface = self.info_font.render(tracking_text, True, tracking_color)
+            self.screen.blit(tracking_surface, (10, 10 + 7 * line_height))
+            
+        # Controls help text
+        help_y = HEIGHT - 120  # Position near bottom
+        help_texts = [
+            "Controls:",
+            "WASD/QEZX - Move rescuer",
+            "T - Toggle AI mode",
+            "R - Reset game"
+        ]
+        
+        for i, text in enumerate(help_texts):
+            color = (200, 200, 200) if i == 0 else (150, 150, 150)
+            help_surface = self.help_font.render(text, True, color)
+            self.screen.blit(help_surface, (10, help_y + i * 25))
             
         # Game over message
         if self.game_over:
             if self.game_won:
                 result_text = "SURVIVOR FOUND!"
                 color = (0, 255, 0)
+            elif self.entities.survivor.points <= 0:
+                result_text = "SURVIVOR DIED!"
+                color = (255, 100, 100)
             else:
                 result_text = "GAME OVER - OUT OF RESOURCES"
                 color = (255, 0, 0)
                 
             # Use a larger font for game over message
-            game_over_font = pygame.font.SysFont(None, int(self.size * 3))
-            result_surface = game_over_font.render(result_text, True, color)
+            result_surface = self.result_font.render(result_text, True, color)
             text_rect = result_surface.get_rect(center=(WIDTH//2, HEIGHT//2))
             self.screen.blit(result_surface, text_rect)
             
             # Instructions to restart
             restart_text = "Press 'R' to restart"
-            restart_surface = self.font.render(restart_text, True, (255, 255, 255))
+            restart_surface = self.info_font.render(restart_text, True, (255, 255, 255))
             restart_rect = restart_surface.get_rect(center=(WIDTH//2, HEIGHT//2 + 50))
             self.screen.blit(restart_surface, restart_rect)
 
@@ -493,6 +589,14 @@ class Game:
             # AI move if enabled
             self.ai_move()
             
+            # Only update messages if rescuer is on a message tile
+            current_hex = self.entities.rescuer.hexEntity
+            decrypted_messages = self.message_manager.update_messages(current_hex, self.clock.get_time() / 1000.0)
+            
+            # Print decrypted messages to console
+            for message in decrypted_messages:
+                print(f"Message decrypted: {message}")
+                
             # Check game conditions
             self.check_win_condition()
             self.check_lose_condition()
@@ -503,8 +607,16 @@ class Game:
             # Rendering
             self.screen.fill((0, 0, 0))
             self.draw_map()
+            
+            # Draw paper icons for unfound messages
+            self.message_manager.draw_papers(self.screen)
+            
             self.spawn()
             self.draw_game_info()
+            
+            # Draw active decrypted messages
+            rescuer_screen_pos = self.entities.rescuer.position
+            self.message_manager.draw_active_messages(self.screen, rescuer_screen_pos)
 
             if self.debugger:
                 self.debugger.overlay()
