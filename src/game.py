@@ -66,10 +66,18 @@ class Game:
         self.current_path = []
         
         # New: Search metrics
-        self.search_start_time = time.time()
+        self.search_start_time = None  # Changed: We'll set this when AI mode is activated
+        self.ai_active_time = 0  # New: Track how long AI has been active
         self.total_search_time = 0
         self.total_games = 0
         self.games_won = 0
+        self.win_message_shown = False  # New: Flag to track if win message has been displayed
+        
+        # New: Success rate based on proximity
+        self.initial_distance = self.map.hex_distance(
+            self.entities.rescuer.hexEntity, 
+            self.entities.survivor.hexEntity
+        )
         self.success_rate = 0
         
         if DEBUG:
@@ -94,24 +102,32 @@ class Game:
     def check_win_condition(self):
         """Check if rescuer has found survivor"""
         if self.entities.rescuer.hexEntity == self.entities.survivor.hexEntity:
-            print("Survivor found! Game won!")
-            self.game_over = True
-            self.game_won = True
-            self.total_games += 1
-            self.games_won += 1
-            self.total_search_time = time.time() - self.search_start_time
-            self.success_rate = (self.games_won / self.total_games) * 100 if self.total_games > 0 else 0
+            if not self.game_over:  # Only print and update stats once
+                print("Survivor Found! Game Won!")
+                self.game_over = True
+                self.game_won = True
+                self.total_games += 1
+                self.games_won += 1
+                
+                # Only calculate search time if AI mode was used
+                if self.search_start_time is not None:
+                    self.total_search_time = time.time() - self.search_start_time
+                
+                self.win_message_shown = True  # Mark that we've shown the message
             return True
         return False
     
     def check_lose_condition(self):
         """Check if resources are depleted"""
         if self.entities.rescuer.resources <= 0:
-            print("Out of resources! Game over!")
-            self.game_over = True
-            self.total_games += 1
-            self.total_search_time = time.time() - self.search_start_time
-            self.success_rate = (self.games_won / self.total_games) * 100 if self.total_games > 0 else 0
+            if not self.game_over:  # Only print and update stats once
+                print("Out of resources! Game over!")
+                self.game_over = True
+                self.total_games += 1
+                
+                # Only calculate search time if AI mode was used
+                if self.search_start_time is not None:
+                    self.total_search_time = time.time() - self.search_start_time
             return True
         return False
     
@@ -154,9 +170,29 @@ class Game:
                 if np.random.random() < 0.3:  # 30% chance to forget position completely
                     self.last_known_survivor_position = None
     
+    def update_success_rate(self):
+        """Update success rate based on proximity to survivor"""
+        current_distance = self.map.hex_distance(
+            self.entities.rescuer.hexEntity,
+            self.entities.survivor.hexEntity
+        )
+        
+        # Calculate success rate as a percentage of distance covered
+        # The closer we get, the higher the success rate
+        if self.initial_distance > 0:  # Avoid division by zero
+            distance_covered = self.initial_distance - current_distance
+            self.success_rate = min(100, max(0, (distance_covered / self.initial_distance) * 100))
+        else:
+            # If they're starting in the same hex, immediate success
+            self.success_rate = 100
+    
     def ai_move(self):
         """Let AI control the rescuer with fog of war constraints"""
         if self.ai_mode and not self.game_over:
+            # Start the search timer if it hasn't been started yet
+            if self.search_start_time is None:
+                self.search_start_time = time.time()
+                
             # Only perform AI move if no manual movement was made
             if not self.rescuer_moved:
                 # Update survivor tracking information
@@ -189,6 +225,9 @@ class Game:
                 self.rescuer_moved = True
                 self.steps_taken += 1
                 self.move_survivor_randomly()
+                
+                # Update success rate based on new positions
+                self.update_success_rate()
 
     def handle_single_event(self, event):
         if event.type == pygame.QUIT:
@@ -200,6 +239,14 @@ class Game:
             if event.key == pygame.K_t:
                 self.ai_mode = not self.ai_mode
                 print(f"AI Mode: {'Enabled' if self.ai_mode else 'Disabled'}")
+                
+                # Start timing when AI is first enabled
+                if self.ai_mode and self.search_start_time is None:
+                    self.search_start_time = time.time()
+                    
+                # If AI is disabled, we don't reset the timer
+                # This way we only count time when AI is active
+                
                 return None
                 
             # Reset game with 'R' key
@@ -230,6 +277,9 @@ class Game:
                     
                     # Update survivor tracking when player moves manually
                     self.update_survivor_tracking()
+                    
+                    # Update success rate based on new positions
+                    self.update_success_rate()
 
                 if moved == None:
                     dir = "nowhere"
@@ -351,15 +401,17 @@ class Game:
         self.screen.blit(steps_surface, (10, 10 + line_height))
         
         # Search time (formatted to 2 decimal places)
-        if not self.game_over:
+        if self.ai_mode and self.search_start_time is not None and not self.game_over:
             current_time = time.time() - self.search_start_time
             time_text = f"Search Time: {current_time:.2f}s"
-        else:
+        elif self.game_over and self.total_search_time > 0:
             time_text = f"Search Time: {self.total_search_time:.2f}s"
+        else:
+            time_text = "Search Time: 0.00s"
         time_surface = self.font.render(time_text, True, (255, 255, 255))
         self.screen.blit(time_surface, (10, 10 + 2 * line_height))
         
-        # Success rate
+        # Success rate based on proximity to target
         rate_text = f"Success Rate: {self.success_rate:.1f}%"
         rate_surface = self.font.render(rate_text, True, (255, 255, 255))
         self.screen.blit(rate_surface, (10, 10 + 3 * line_height))
