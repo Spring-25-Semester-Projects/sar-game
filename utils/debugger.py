@@ -69,7 +69,8 @@ class Debugger:
         for h in self.game.map.hexes.values():
             center = self.game.map.hex_to_screen(h)
 
-            label = self.game.font.render(f"{h.x},{h.y},{h.z}", True, (255, 255, 255))
+            # Use info_font instead of font
+            label = self.game.info_font.render(f"{h.x},{h.y},{h.z}", True, (255, 255, 255))
             text_rect = label.get_rect(center=(np.array([center.q,center.r])+OFFSET))
 
             self.game.screen.blit(label, text_rect)
