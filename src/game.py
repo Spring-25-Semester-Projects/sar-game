@@ -10,7 +10,6 @@ from entities.survivor import Survivor
 from entities.items import Item, Weapon, Food
 from config import WIDTH, HEIGHT, FPS, OFFSET, SURVIVOR_COLOR, ITEM_COLOR, HEX_COLOR
 from add.chest import Chest
-
 class FogOfWar:
     def __init__(self, map: Map, vision_radius=3):
         self.map = map
@@ -128,8 +127,7 @@ class Game:
         """Spawn random items at random locations, avoiding water"""
         valid_hexes = [hex_coord for hex_coord in self.map.hexes.keys() 
                     if hex_coord.terrain_type != 'water']
-         
-        #delete if not needed
+        
         item_types = [
             ("Medkit", "weapon", 15),
             ("Knife", "weapon", 10),
@@ -159,7 +157,6 @@ class Game:
                 # Rescuer movement (keys 1-6)
                 if pygame.K_1 <= event.key <= pygame.K_6:
                     self.rescuer.move(event.key - pygame.K_1 + 1)
-                # delete these 2 if not needed 
                 
                 # Item pickup (E key)
                 elif event.key == pygame.K_e:
@@ -173,7 +170,7 @@ class Game:
                 elif event.key == pygame.K_d:
                     pass
                 
-                # Fog of war toggle (F key) 
+                # Fog of war toggle (F key)
                 elif event.key == pygame.K_f:
                     self.fog_of_war.toggle()
 
@@ -198,18 +195,16 @@ class Game:
             for survivor in self.survivors:
                 survivor.draw(self.screen)
                 survivor.render_status(self.screen)
-                survivor.draw_message(self.screen)
                 
             for item in self.items:
                 item.render(self.screen, self.map)
-            self.rescuer.draw(self.screen)
-
+            self.rescuer.draw(self.screen)  
     def update(self):
         """Update game state"""
         dt = self.clock.get_time() / 1000.0
         
         # Update rescuer
-        self.rescuer.update()
+        self.rescuer.update(dt)
         
         # Update survivors
         for survivor in self.survivors[:]:

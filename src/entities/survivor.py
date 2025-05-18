@@ -6,12 +6,11 @@ from utils.sprites import SpriteSheet
 from config import *
 from map import *
 from entities.mock_entity import Entity
-# In survivor.py, change this line:
 from entities.items import Inventory, Item, Weapon
-from add.crypto import SimpleCrypto
 Directions = namedtuple('Direction', ['SS', 'SE', 'SW', 'NN', 'NE', 'NW'])
 CONST_DIRECTION = Directions(SS=0, SE=1, SW=2, NN=3, NE=4, NW=5)
 import pygame
+
 
 
 class SpriteSheet:
@@ -34,6 +33,8 @@ def load_sprite_sheet(path, frame_count, frame_size, scale=1, colorkey=(0, 0, 0)
     return [sheet.get_img(i, *frame_size, scale, colorkey) for i in range(frame_count)] 
 
 
+    
+    
 
 class Survivor(Entity):
     def __init__(self, game_map: Map, color=SURVIVOR_COLOR, health: int = 100, speed: int = 1, ai_type: str = None):
@@ -42,11 +43,7 @@ class Survivor(Entity):
         self.speed = speed * 2
         self.target_hex = None
         self.irrational_chance = 0.3
-        self.encrypted_messages = []
-        self.decryption_progress = 0
-        self.current_message = None
-        self.message_timer = 0
-        self.decryption_speed = random.uniform(0.3, 0.8)
+        
 
         # Sprite properties
         sprite_img = pygame.image.load("assets/Males/M_06.png").convert_alpha()
@@ -89,7 +86,7 @@ class Survivor(Entity):
                 terrain_speeds = {
                     'plain': 1.0,
                     'forest': 3.0,
-                    'mountain': 6.0
+                    'mountain': 5.0
                 }
                 move_duration = terrain_speeds.get(target_hex.terrain_type, 1.0)
                 
@@ -165,41 +162,7 @@ class Survivor(Entity):
             
             if direction:
                 self.move(direction)
-        if random.random() < 0.001:  # chance of finding message per frame
-            self.find_message()   
-            
-        self.update_decryption(dt)
-        
-        # Update message timer
-        if self.message_timer > 0:
-            self.message_timer -= dt
-            if self.message_timer <= 0:
-                self.current_message = None
-                
-                
-        
-    def draw_message(self, screen):
-        """Draw the current decrypted message with background box"""
-        if self.current_message and self.message_timer > 0:
-            font = pygame.font.SysFont('Arial', 20, bold=True)
-            
-            # Render text
-            text = font.render(self.current_message, True, (0, 0, 0))
-            
-            # Create background surface
-            bg_width = text.get_width() + 20
-            bg_height = text.get_height() + 10
-            background = pygame.Surface((bg_width, bg_height))
-            background.fill((255, 255, 255))
-            background.set_alpha(200)  # Semi-transparent
-            
-            # Calculate position (above survivor)
-            pos_x = self.position[0] - bg_width // 2
-            pos_y = self.position[1] - 50  # Adjust this value as needed
-            
-            # Draw background and text
-            screen.blit(background, (pos_x, pos_y))
-            screen.blit(text, (pos_x + 10, pos_y + 5))        
+              
          
 
     def random_move(self):
@@ -335,40 +298,4 @@ class Survivor(Entity):
     def handle_death(self):
         """Handle death of the survivor"""
         self.alive = False
-    def find_message(self):
-        """Find a random encrypted message"""
-        # we can adjust these messages as we please 
-        messages = [
-            "Food cache at NW sector",
-            "Danger in SE caves!",
-            "Medkit hidden near mountains",
-            "Rescue team arriving tomorrow",
-            "Safe zone at coordinates 45.7, 32.1",
-            "Radio frequency 108.7 has updates",
-            "Water source 200m North",
-            "Bandits spotted in Eastern woods",
-            "Medical supplies in red crate",
-            "Storm approaching from West",
-            "Nightfall brings increased danger",
-            "Look for the marked oak tree",
-            "Underground bunker contains supplies",
-            "Avoid river crossings at night",
-            "Signal fire on highest hill"
-        ]
-        msg = random.choice(messages)
-        key, encrypted = SimpleCrypto.encrypt(msg)
-        self.encrypted_messages.append((key, encrypted)) 
-        
-        
-    def update_decryption(self, dt):
-        """Progressively decrypt messages"""
-        if self.encrypted_messages:
-            self.decryption_progress += dt * self.decryption_speed  # decryption speed (its random per surv)
-            if self.decryption_progress >= 1.0:
-                self.decryption_progress = 0
-                key, encrypted = self.encrypted_messages.pop(0)
-                decrypted = SimpleCrypto.decrypt(key, encrypted)
-                self.current_message = decrypted
-                self.message_timer = 4.0  # Show for 4 seconds
-                return decrypted
-        return None
+    

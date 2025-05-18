@@ -4,6 +4,7 @@ from collections import namedtuple
 from map import Map, Hex
 from config import OFFSET
 import random
+from add.crypto import SimpleCrypto
 
 class SpriteSheet:
     def __init__(self, image):
@@ -46,6 +47,13 @@ class Rescuer:
         # Stats
         self.health = 100
         self.stamina = 100
+        
+        # Crypto
+        self.encrypted_messages = []
+        self.decryption_progress = 0
+        self.current_message = None
+        self.message_timer = 0
+        self.decryption_speed = random.uniform(0.3, 0.8)
 
     def _get_valid_start_hex(self, map: Map):
         """Find a valid starting hex that's not water"""
@@ -88,7 +96,7 @@ class Rescuer:
                     terrain_speeds = {
                         'plain': 1.0,
                         'forest': 3.0,
-                        'mountain': 6.0
+                        'mountain': 5.0
                     }
                     move_duration = terrain_speeds.get(target_hex.terrain_type, 1.0)
                     
@@ -111,7 +119,7 @@ class Rescuer:
                         return True
         return False
 
-    def update(self):
+    def update(self, dt):
         # Handle movement animation
         if self.moving and self.target_hex:
             current_time = pygame.time.get_ticks()
@@ -141,6 +149,43 @@ class Rescuer:
         # Regenerate stamina when not moving
         if not self.moving:
             self.stamina = min(100, self.stamina + 0.2)
+            
+          
+        if random.random() < 0.9:  # % chance per frame 
+            self.find_message()   
+            
+        self.update_decryption(dt)
+        
+        # Update message timer
+        if self.message_timer > 0:
+            self.message_timer -= dt
+            if self.message_timer <= 0:
+                self.current_message = None
+                
+                
+        
+    def draw_message(self, screen):
+        """Draw the current decrypted message with background box"""
+        if self.current_message and self.message_timer > 0:
+            font = pygame.font.SysFont('Arial', 20, bold=True)
+            
+            # Render text
+            text = font.render(self.current_message, True, (0, 0, 0))
+            
+            # Create background surface
+            bg_width = text.get_width() + 20
+            bg_height = text.get_height() + 10
+            background = pygame.Surface((bg_width, bg_height))
+            background.fill((255, 255, 255))
+            background.set_alpha(200)  # Semi-transparent
+            
+            # Calculate position (above survivor)
+            pos_x = self.position[0] - bg_width // 2
+            pos_y = self.position[1] - 50  # Adjust this value as needed
+            
+            # Draw background and text
+            screen.blit(background, (pos_x, pos_y))
+            screen.blit(text, (pos_x + 10, pos_y + 5))            
 
     def draw(self, screen):
         if self.moving:
@@ -154,8 +199,7 @@ class Rescuer:
         player_img = self.animation_list[self.frame]
         sprite_rect = player_img.get_rect(center=self.position)
         screen.blit(player_img, sprite_rect)
-
-# delete these 2 if not needed 
+        self.draw_message(screen)
 
     def heal(self, amount):
         self.health = min(100, self.health + amount)
@@ -164,3 +208,40 @@ class Rescuer:
     def rest(self):
         self.stamina = min(100, self.stamina + 20)
         return self.stamina
+    
+    def find_message(self):
+        """Find a random encrypted message"""
+        messages = [
+            "Food cache at NW sector",
+            "Danger in SE caves!",
+            "Medkit hidden near mountains",
+            "Rescue team arriving tomorrow",
+            "Safe zone at coordinates 45.7, 32.1",
+            "Radio frequency 108.7 has updates",
+            "Water source 200m North",
+            "Bandits spotted in Eastern woods",
+            "Medical supplies in red crate",
+            "Storm approaching from West",
+            "Nightfall brings increased danger",
+            "Look for the marked oak tree",
+            "Underground bunker contains supplies",
+            "Avoid river crossings at night",
+            "Signal fire on highest hill"
+        ]
+        msg = random.choice(messages)
+        key, encrypted = SimpleCrypto.encrypt(msg)
+        self.encrypted_messages.append((key, encrypted)) 
+        
+        
+    def update_decryption(self, dt):
+        """Progressively decrypt messages"""
+        if self.encrypted_messages:
+            self.decryption_progress += dt * self.decryption_speed  # Faster decryption
+            if self.decryption_progress >= 1.0:
+                self.decryption_progress = 0
+                key, encrypted = self.encrypted_messages.pop(0)
+                decrypted = SimpleCrypto.decrypt(key, encrypted)
+                self.current_message = decrypted
+                self.message_timer = 4.0  # Show for 4 seconds
+                return decrypted
+        return None
