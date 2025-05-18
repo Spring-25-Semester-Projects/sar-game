@@ -1,11 +1,12 @@
 import numpy as np
-from src.entities.mock_entity import *
+from src.entities.mock_entity import Entity, Hex
 
 class Survivor(Entity):
     def __init__(self, map):
-        super().__init__(map)
+        # Call parent constructor with the specific sprite path
+        super().__init__(map, sprite_path="sar-game-8-field-of-view/assets/Females/F_10.png")
 
-        # ! THIS IS ONLY FOR TESTING, DEFAUT SPAWN POSITION IS BASED ON SEED
+        # ! THIS IS ONLY FOR TESTING, DEFAULT SPAWN POSITION IS BASED ON SEED
         self.hexEntity = map.hexes[Hex(-12,6,6)]
         self.position = self.entity_position()
 
@@ -13,19 +14,6 @@ class Survivor(Entity):
         self.hunger = 0
         self.stats = [self.points, self.stamina, self.hunger]
         self.sane = True # Well, for now.
-        
-        # Override sprite image for survivor
-        sprite_img = pygame.image.load("sar-game-8-field-of-view/assets/Females/F_10.png").convert_alpha()
-        self.sprite_sheet = SpriteSheet(sprite_img)
-        self.animation_list = []
-        self.animation_steps = 3  # Using only 3 front-facing frames
-        self.frame = 0
-        self.last_update = pygame.time.get_ticks()
-        self.animation_cooldown = 200
-        
-        # Initialize animation frames - use the front-facing frames only
-        for x in range(self.animation_steps):
-            self.animation_list.append(self.sprite_sheet.get_img(x, 17, 17, 2.75, (0, 0, 0)))
 
     def eat(self, vl):
         self.stats = [self.stats[0], max(self.hunger - vl, 0), min(self.stamina + ((1/3) * vl), 100)]
