@@ -9,7 +9,7 @@ CONST_scale_matrix = np.array([[1,0],[0,(1.15)*(3/2)/(np.sqrt(3))]])
 
 CONST_flatTopped_matrix = np.array([[3/2, 0],[np.sqrt(3)/2, np.sqrt(3)]])
 
-CONST_screen_matrix = np.array([[0, 0],[WIDTH, 0],[0, HEIGHT],[WIDTH, HEIGHT]]) - OFFSET # Sceond term is to center.
+CONST_screen_matrix = np.array([[0, 0],[WIDTH, 0],[0, HEIGHT],[WIDTH, HEIGHT]]) - OFFSET
 
 Costs = namedtuple('Cost', ['zero', 'one', 'two', 'three', 'four', 'block'])
 CONST_cost = tuple(Costs(zero=0, one=1, two=2, three=3, four=4, block=float('-inf')))
@@ -17,10 +17,7 @@ CONST_cost = tuple(Costs(zero=0, one=1, two=2, three=3, four=4, block=float('-in
 class Map:
     def __init__(self, radius=SIZE):
         self.radius = radius
-
-        # This long variable just turns the pixel coord.’s to hex coord. (for screen), so it knows where the tile boundary is.
         screen_to_hex_matrix = np.array([np.linalg.inv(self.radius * CONST_flatTopped_matrix) @ ar for ar in CONST_screen_matrix]) 
-
         min_screenHex = np.floor(np.min(screen_to_hex_matrix, axis=0))-2
         max_screenHex = np.ceil(np.max(screen_to_hex_matrix, axis=0))+2
 
@@ -38,8 +35,20 @@ class Map:
                 if 0 <= px < WIDTH and 0 <= py < HEIGHT:
                    s = -q-r
                    h = Hex(q, r, s)
-
                    self.hexes[h] = h
+
+    def walkable_hex_distance(self, h1: Hex, h2: Hex):
+        distance = self.hex_distance(h1, h2)
+        if distance == 0:
+            return [h1]
+
+        path = []
+        for i in range(1, distance + 1):
+            fraction = i / distance
+            q = h1.x + (h2.x - h1.x) * fraction
+            r = h1.z + (h2.z - h1.z) * fraction
+            path.append(self.hex_round(Hex(q, -q-r, r)))
+        return path
 
     def hex_to_screen(self, hex: Hex):
         hexagon_matrix = self.radius * (CONST_flatTopped_matrix @ np.array([hex.x, hex.z]))
