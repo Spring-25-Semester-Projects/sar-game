@@ -44,12 +44,18 @@ class Game:
         self.costs = self.map.map_cost()
         self.entities = Entities(Survivor(self.map), Rescuer(self.map))
         self.visited = deque([self.entities.rescuer.hexEntity])
+
+
+        self.survivor_visibility_counter = 0  # Track how many cycles survivor is visible
+        self.last_ping_position = None  # Store last ping position
+        self.ping_sent = False  # Track if ping was sent for current sighting
         
         # Initialize the crypto message system
         self.message_manager = MessageManager(self.map)
         
         # Pass costs to the rescuer for more informed decision making
         self.entities.rescuer.costs = self.costs
+        self.entities.survivor.costs = self.costs
         
         # Set fair amount of resources for rescuer (200 instead of infinite)
         #self.entities.rescuer.resources = 200
@@ -163,43 +169,48 @@ class Game:
         return False
     
     def can_see_survivor(self):
-        """Check if the survivor is visible to the rescuer within fog of war constraints"""
-        # Check if survivor is in a visible hex (rescuer's hex or adjacent)
-        rescuer_hex = self.entities.rescuer.hexEntity
-        survivor_hex = self.entities.survivor.hexEntity
-        
-        # If they're in the same hex
-        if rescuer_hex == survivor_hex:
-            return True
+            """Check if survivor is within 3 hexes and visible"""
+            rescuer_hex = self.entities.rescuer.hexEntity
+            survivor_hex = self.entities.survivor.hexEntity
             
-        # If survivor is in adjacent hex
-        if survivor_hex in self.map.neighbor_hex(rescuer_hex):
-            return True
-            
-        # If survivor is in a visited hex and within a certain distance
-        # This simulates being able to see further in areas you've already explored
-        if survivor_hex in self.visited:
-            # Can see within 2 hexes in visited areas
-            if self.map.hex_distance(rescuer_hex, survivor_hex) <= 2:
+            # Same hex
+            if rescuer_hex == survivor_hex:
                 return True
                 
-        return False
+            # Within 3 hexes distance
+            distance = self.map.hex_distance(rescuer_hex, survivor_hex)
+            if distance <= 3:
+                # Check line of sight (walkable path)
+                path = self.map.walkable_hex_distance(rescuer_hex, survivor_hex)
+                if path:
+                    for hex in path[1:-1]:  # Skip first and last (rescuer and survivor positions)
+                        if self.costs[hex] == float('-inf'):  # Blocked tile
+                            return False
+                    return True
+            return False
 
     def update_survivor_tracking(self):
-        """Update the tracking of the survivor based on visibility"""
-        if self.can_see_survivor():
-            self.survivor_spotted = True
-            self.last_known_survivor_position = self.entities.survivor.hexEntity
-            self.turns_since_spotted = 0
-        else:
-            self.survivor_spotted = False
-            self.turns_since_spotted += 1
-            
-            # After many turns without spotting, increase uncertainty
-            if self.turns_since_spotted > 10:
-                # Gradually reduce confidence in last known position
-                if np.random.random() < 0.3:  # 30% chance to forget position completely
-                    self.last_known_survivor_position = None
+            """Update tracking and handle pings"""
+            if self.can_see_survivor():
+                self.survivor_spotted = True
+                self.last_known_survivor_position = self.entities.survivor.hexEntity
+                self.survivor_visibility_counter += 1
+                self.turns_since_spotted = 0
+                
+                # Send ping if visible for 2 cycles and no ping sent yet
+                if self.survivor_visibility_counter >= 2 and not self.ping_sent:
+                    self.last_ping_position = self.entities.survivor.hexEntity
+                    print(f"PING! Survivor spotted at {self.last_ping_position}")
+                    self.ping_sent = True
+            else:
+                self.survivor_spotted = False
+                self.survivor_visibility_counter = 0
+                self.ping_sent = False
+                self.turns_since_spotted += 1
+                
+                if self.turns_since_spotted > 10:
+                    if np.random.random() < 0.3:
+                        self.last_known_survivor_position = None
     
     def update_success_rate(self):
         """Update success rate based on proximity to survivor"""
@@ -349,20 +360,16 @@ class Game:
                 if self.debugger:
                     self.debugger.get_entity_feed(dir)
     
+    # Modify the move_survivor_randomly method:
     def move_survivor_randomly(self):
-        """Move survivor randomly and apply tile damage"""
-        if np.random.random() < 0.75:
-            random_dir_index = np.random.randint(0, 6)
-            directions = ["NN", "NE", "NW", "SS", "SE", "SW"]
-            random_dir = directions[random_dir_index]
-            
-            # Move the survivor
-            moved = self.entities.survivor.move(random_dir)
-            
-            # If the survivor successfully moved, apply tile damage
-            if moved is not None:
-                self.survivor_takes_tile_damage()
-    
+        """Let survivor decide when to move based on its own logic"""
+        move_result = self.entities.survivor.decide()
+        
+        if move_result is not None:
+            self.survivor_takes_tile_damage()
+            # Update the rescuer's knowledge of survivor position if visible
+            self.update_survivor_tracking()
+        
     def update_event_info(self):
         for event in pygame.event.get():
 
@@ -452,6 +459,10 @@ class Game:
                     cost_text = self.cost_font.render(str(cost), True, (255, 255, 255))
                     text_rect = cost_text.get_rect(center=(center.q + OFFSET[0], center.r + OFFSET[1]))
                     self.screen.blit(cost_text, text_rect)
+
+        if self.last_ping_position:
+            vertices, _ = self.map.draw_hex(self.last_ping_position)
+            pygame.draw.polygon(self.screen, (255, 255, 0), vertices, 3) 
 
     def draw_game_info(self):
         """Display game information like resources and steps"""
@@ -603,7 +614,7 @@ class Game:
             
             # Reset the movement flag for next frame
             self.rescuer_moved = False
-            
+            self.update_survivor_tracking()
             # Rendering
             self.screen.fill((0, 0, 0))
             self.draw_map()
