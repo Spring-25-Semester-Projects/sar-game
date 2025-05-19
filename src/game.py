@@ -43,7 +43,6 @@ class Game:
         self.removeRed = False
         self.events_info = []
         self.map = Map(radius)
-        self.costs = self.map.map_cost()
         self.visible = {}
         self.entities = Entities(Survivor(self.map), Rescuer(self.map))
         self.visited = deque([self.entities.rescuer.hexEntity])
@@ -70,7 +69,7 @@ class Game:
     def see_hex(self):
         q = self.entities.rescuer.hexEntity
         
-        self.visible = field_of_view(q, self.map, self.costs, limit=-1)  
+        self.visible = field_of_view(q, self.map, self.visited, limit=-1)  
 
     def handle_single_event(self, event):
         if event.type == pygame.QUIT:
@@ -126,7 +125,7 @@ class Game:
             if self.debugger.toggleOverlay and self.debugger.removeFog:
                 return color, border_color
 
-        if not h in self.visible or not h in self.visited:
+        if not h in self.visible:
             border_color,color = (0,0,0),(0,0,0)
 
         if h not in self.visited and any(neighbor == h for neighbor in  self.map.neighbor_hex(self.entities.rescuer.hexEntity)):
@@ -147,7 +146,7 @@ class Game:
     def draw_map(self):
         for h in self.map.hexes.values():
                 border_color = (50,50,50)
-                cost = self.costs[h]
+                cost = self.map.costs[h]
                 vertices, color = self.map.draw_hex(h)
 
                 if self.debugger:

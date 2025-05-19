@@ -41,7 +41,7 @@ def ReportReflexVertex(chain : Chain):
         
     return reflexVertices
 
-def B_linecast(p : Hex, Q: Hex, map : Map, costs, limit=-1):
+def B_linecast(p : Hex, Q: Hex, map : Map, limit=-1):
     pcenter = Center(p.x,p.z)
     Qcenter = Center(Q.x, Q.z)
 
@@ -67,32 +67,6 @@ def B_linecast(p : Hex, Q: Hex, map : Map, costs, limit=-1):
             
     p1,p2 = pcenter.q,pcenter.r
     path = []
-
-        # Special case: purely horizontal line
-    if dcenter[1] == 0:
-        for q in range(pcenter.q + step[0], Qcenter.q + step[0], step[0]):
-            h = Hex(q, pcenter.r, -q - pcenter.r)
-            if limit >= 0 and map.hex_distance(p, h) > limit:
-                break
-            if not map.hexes.get(h):
-                break
-            if costs[h] == float('inf'):
-                continue
-            path.append(h)
-        return path
-
-    # Special case: purely vertical line
-    if dcenter[0] == 0:
-        for r in range(pcenter.r + step[1], Qcenter.r + step[1], step[1]):
-            h = Hex(pcenter.q, r, -pcenter.q - r)
-            if limit >= 0 and map.hex_distance(p, h) > limit:
-                break
-            if not map.hexes.get(h):
-                break
-            if costs[h] == float('inf'):
-                continue
-            path.append(h)
-        return path
             
     for i in range(steps):
         p1,p2 = primary_step(p1,p2)
@@ -102,26 +76,14 @@ def B_linecast(p : Hex, Q: Hex, map : Map, costs, limit=-1):
                 h = Hex(q, pcenter.r, -q - pcenter.r)
                 if limit >= 0 and map.hex_distance(p, h) > limit:
                     break
+
                 if not map.hexes.get(h):
                     break
-                if costs[h] == float('inf'):
-                    continue
+
+                if map.costs[h] == float('-inf'):
+                    break
 
                 path.append(h)
-
-    # Special case: purely vertical line
-        if dcenter[0] == 0:
-            for r in range(pcenter.r + step[1], Qcenter.r + step[1], step[1]):
-                h = Hex(pcenter.q, r, -pcenter.q - r)
-                if limit >= 0 and map.hex_distance(p, h) > limit:
-                    break
-                if not map.hexes.get(h):
-                    break
-                if costs[h] == float('inf'):
-                    continue
-                
-                path.append(h)
-            
 
         error -= Nerror
 
@@ -138,21 +100,21 @@ def B_linecast(p : Hex, Q: Hex, map : Map, costs, limit=-1):
         if not map.hexes.get(h):
             break
 
-        if costs[h] == float('inf'):
-            continue
+        if map.costs[h] == float('-inf'):
+            break
 
         path.append(h)
     
     return path
 
-def field_of_view(p: Hex, map: Map, costs, limit=-1):
+def field_of_view(p: Hex, map: Map, visited, limit=-1):
     visible = {}
 
     fhorizon = []
     for x in range(map.min_x, map.max_x):
         for z in (map.min_z, map.max_z-1):
             Q = Hex(x, z, -x-z)
-            ray = B_linecast(p, Q, map, costs, limit)
+            ray = B_linecast(p, Q, map, limit)
 
             if ray:
                 for h in ray:
@@ -163,7 +125,7 @@ def field_of_view(p: Hex, map: Map, costs, limit=-1):
     for z in range(map.min_z+1, map.max_z-1):
         for x in (map.min_x, map.max_x-1):
             Q = Hex(x, z, -x-z)
-            ray = B_linecast(p, Q, map, costs, limit)
+            ray = B_linecast(p, Q, map, limit)
 
             if ray:
                 for h in ray:
@@ -186,7 +148,7 @@ def field_of_view(p: Hex, map: Map, costs, limit=-1):
     reflex_vertices = ReportReflexVertex(chain)
 
     for Q in reflex_vertices:
-        ray = B_linecast(p, Hex(Q[0],Q[1],-Q[1]-Q[0]), map, costs, limit)
+        ray = B_linecast(p, Hex(Q[0],Q[1],-Q[1]-Q[0]), map, limit)
         if ray:
             for h in ray:
                 visible[h] = True

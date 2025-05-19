@@ -40,6 +40,14 @@ class Map:
                    h = Hex(q, r, s)
 
                    self.hexes[h] = h
+        
+        self.costs = {}
+        for h in self.hexes.values():
+
+            self.costs[h] = CONST_cost[np.random.randint(0,6)]
+        
+        if (h.x,h.y,h.z) == (0,0,0):
+            self.costs[h] = 0
 
     def hex_to_screen(self, hex: Hex):
         hexagon_matrix = self.radius * (CONST_flatTopped_matrix @ np.array([hex.x, hex.z]))
@@ -64,6 +72,8 @@ class Map:
 
         for nb in neighbors_matrix:
             if not self.hexes.get(Hex(*nb)):
+                neighbors.append(None)
+            elif self.costs[Hex(*nb)] == float('-inf'):
                 neighbors.append(None)
             else:
                 neighbors.append(self.hexes[Hex(*nb)])
@@ -108,14 +118,6 @@ class Map:
             return hexes_to_walk
 
         return interpol()
-    
-    def map_cost(self):
-        costs = {}
-        
-        for h in self.hexes.values():
-            costs[h] = CONST_cost[np.random.randint(0,6)]
-
-        return costs
 
     def draw_hex(self, hex: Hex):
         center = self.hex_to_screen(hex)
