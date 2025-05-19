@@ -12,7 +12,6 @@ class Survivor(Entity):
         
         self.stamina = 100
         self.hunger = 0
-        self.stats = [self.points, self.stamina, self.hunger]
         self.sane = True
         self.move_counter = 0
         self.move_frequency = random.randint(1, 3)
@@ -20,8 +19,6 @@ class Survivor(Entity):
         self.visited_hexes = deque(maxlen=10)
         self.exploration_boost = 1.0
 
-    def eat(self, vl):
-        self.stats = [self.stats[0], max(self.hunger - vl, 0), min(self.stamina + ((1/3) * vl), 100)]
         
     def decide(self):
         self.move_counter += 1

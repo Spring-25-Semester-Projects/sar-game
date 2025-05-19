@@ -37,18 +37,6 @@ class Map:
                    h = Hex(q, r, s)
                    self.hexes[h] = h
 
-    def walkable_hex_distance(self, h1: Hex, h2: Hex):
-        distance = self.hex_distance(h1, h2)
-        if distance == 0:
-            return [h1]
-
-        path = []
-        for i in range(1, distance + 1):
-            fraction = i / distance
-            q = h1.x + (h2.x - h1.x) * fraction
-            r = h1.z + (h2.z - h1.z) * fraction
-            path.append(self.hex_round(Hex(q, -q-r, r)))
-        return path
 
     def hex_to_screen(self, hex: Hex):
         hexagon_matrix = self.radius * (CONST_flatTopped_matrix @ np.array([hex.x, hex.z]))

@@ -12,20 +12,7 @@ class SpriteSheet:
         self.sheet = image
         
     def get_img(self, frame, width, height, scale, color):
-        """Extract an image from a sprite sheet
-        
-        Args:
-            frame: The frame number to extract
-            width: Width of each frame
-            height: Height of each frame
-            scale: Scale factor to apply
-            color: Color key to make transparent
-            
-        Returns:
-            The extracted and scaled image
-        """
         image = pygame.Surface((width, height)).convert_alpha()
-        # Use vertical position (frame * height) instead of horizontal position
         image.blit(self.sheet, (0, 0), (0, (frame * height), width, height)) 
         image = pygame.transform.scale(image, (int(width * scale), int(height * scale)))  
         image.set_colorkey(color)
@@ -39,11 +26,9 @@ class Entity:
         self.points = float('inf')
         self.position = self.entity_position()
         
-        # Sprite properties
         if sprite_path:
             self.init_sprite_animation(sprite_path)
         else:
-            # Create default animation list with a placeholder
             self.animation_list = [pygame.Surface((17 * 2.75, 17 * 2.75))]
             self.animation_list[0].fill(self.color)
             self.frame = 0
@@ -51,22 +36,19 @@ class Entity:
             self.animation_cooldown = 200
         
     def init_sprite_animation(self, sprite_path):
-        """Initialize sprite animation properties"""
         try:
             sprite_img = pygame.image.load(sprite_path).convert_alpha()
             self.sprite_sheet = SpriteSheet(sprite_img)
             self.animation_list = []
-            self.animation_steps = 3  # Using only 3 front-facing frames
+            self.animation_steps = 3 
             self.frame = 0
             self.last_update = pygame.time.get_ticks()
             self.animation_cooldown = 200
             
-            # Initialize animation frames - use the front-facing frames only
             for x in range(self.animation_steps):
                 self.animation_list.append(self.sprite_sheet.get_img(x, 17, 17, 2.75, (0, 0, 0)))
         except Exception as e:
             print(f"Error loading sprite from {sprite_path}: {e}")
-            # Create placeholder animation list with a colored rectangle
             self.animation_list = [pygame.Surface((17 * 2.75, 17 * 2.75))]
             self.animation_list[0].fill(self.color)
             self.frame = 0
@@ -91,17 +73,11 @@ class Entity:
         self.hexEntity = move_to_tiles[dir_attr]
         self.position = self.entity_position()
         
-        # Update animation frame when moving
         self.update_animation(force=True)
 
         return list(move_to_tiles[dir_attr])
-    
-    def hurt(self, vl):
-        self.points -= vl
-        return self.points
-        
+
     def update_animation(self, force=False):
-        """Updates animation frame based on cooldown timer"""
         if not hasattr(self, 'animation_steps') or self.animation_steps <= 1:
             return
             
