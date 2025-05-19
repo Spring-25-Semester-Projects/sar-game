@@ -1,17 +1,21 @@
 import os
+import numpy as np
 from dotenv import load_dotenv
 
-WIDTH, HEIGHT = 800, 600
+WIDTH, HEIGHT = 1400, 800
 FPS = 60
 
-HEX_W = 30
-HEX_H = 30
-
-HEX_COLOR = (30, 30, 30)
+HEX_COLOR = (50, 50, 50)
 
 ENTITY_COLOR = (46, 204, 113)
 
-OFFSET = (WIDTH/2, HEIGHT/2)
+COST_COLORS = [(220, 20, 60), (178, 34, 34), (205, 92, 92), (255, 99, 71), (139, 0, 0), (240, 128, 128), (93, 58, 102)]
+
+OFFSET = np.array([WIDTH/2, HEIGHT/2])
+
+SIZE = 13
+
+SEGEMENT = 15
 
 load_dotenv()
-DEBUG = os.getenv("DEBUG", "False") == "True"
+DEBUG = os.getenv("DEBUG")
