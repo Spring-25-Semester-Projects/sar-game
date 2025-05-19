@@ -115,16 +115,16 @@ class Rescuer(Entity):
         return []
     
     def _calculate_visit_penalty(self, hex):
-        """Calculate penalty for visiting a frequently visited hex"""
+        """Calculate penalty for visiting a frequently visited hex."""
         visit_count = self.visit_count[hex]
         
         # Exponential penalty for frequently visited hexes
         if visit_count >= self.stuck_threshold:
-            return visit_count * self.exploration_boost * 2.0
+            return visit_count * self.exploration_boost * 5.0  # Increased penalty
         
         # Minor penalty for recently visited hexes
         if hex in self.visit_history:
-            return 1.0 * self.exploration_boost
+            return 2.0 * self.exploration_boost  # Increased penalty
             
         return 0
     
@@ -346,10 +346,9 @@ class Rescuer(Entity):
             cost_score = -costs[rescuer_pos] if costs[rescuer_pos] != float('-inf') else -100
             
             # Higher reward for unvisited tiles to encourage exploration
-            exploration_score = 15 if rescuer_pos not in visited_hexes else 0
-            
-            # Add a novelty bonus for hexes not in recent history
-            novelty_bonus = 10 if rescuer_pos not in self.visit_history else 0
+            # Inside the _expectimax_score method, adjust these lines:
+            exploration_score = 50 if rescuer_pos not in visited_hexes else 0  # Increased from 15
+            novelty_bonus = 25 if rescuer_pos not in self.visit_history else 0  # Increased from 10
             
             return distance_score + cost_score + exploration_score + novelty_bonus
         
@@ -392,43 +391,56 @@ class Rescuer(Entity):
             
             return total_score
     
+
     def explore_decision(self, visited_hexes, costs):
-        """
-        Decide which direction to move for exploration.
-        Prioritize unvisited hexes with lower cost, avoiding loops.
-        """
+        """Decide which direction to move for exploration with stronger preference for hidden tiles."""
         neighbors = self.map.neighbor_hex(self.hexEntity)
         valid_neighbors = [n for n in neighbors if n is not None and costs[n] != float('-inf')]
         
         if not valid_neighbors:
             return None
         
-        # Check if we're in a potential loop (revisiting same hexes)
-        current_pos = self.hexEntity
-        is_looping = self._detect_loop()
+        # Convert visited_hexes to a set for faster lookups
+        visited_set = set(visited_hexes)
         
-        # Prioritize unvisited neighbors
-        unvisited = [n for n in valid_neighbors if n not in visited_hexes]
+        # Prioritize unvisited neighbors more aggressively
+        unvisited = [n for n in valid_neighbors if n not in visited_set]
         
         if unvisited:
             # Found new territories to explore - reset exploration metrics
             self.last_exploration_time = time.time()
             self.exploration_boost = 1.0
             
-            # Sort by cost (prefer lower cost tiles)
-            unvisited.sort(key=lambda x: costs[x])
-            return unvisited[0]  # Choose the lowest cost unvisited neighbor
+            # Sort by cost (prefer lower cost tiles) but prioritize unvisited
+            unvisited.sort(key=lambda x: (costs[x], random.random()))  # Add some randomness
+            return unvisited[0]
         
-        # All neighbors visited - need to choose based on other factors
-        if is_looping:
-            # We're in a loop - find the least visited neighbor
-            visit_counts = [(n, self.visit_count[n]) for n in valid_neighbors]
-            least_visited = min(visit_counts, key=lambda x: x[1])[0]
-            return least_visited
-        else:
-            # Not in a loop yet - use normal cost-based decision
-            valid_neighbors.sort(key=lambda x: costs[x] + self._calculate_visit_penalty(x))
-            return valid_neighbors[0]
+        # All neighbors visited - find the closest unvisited hex in the entire map
+        all_unvisited = [h for h in self.map.hexes.values() if h not in visited_set]
+        if all_unvisited:
+            # Find several closest unvisited hexes and pick one randomly
+            closest_hexes = sorted(
+                all_unvisited,
+                key=lambda h: self.hex_distance(self.hexEntity, h)
+            )[:5]  # Consider top 5 closest
+            
+            if closest_hexes:
+                # Generate path to a randomly selected close unvisited hex
+                target_hex = random.choice(closest_hexes)
+                path = self.a_star_pathfinding(self.hexEntity, target_hex, costs)
+                if path and len(path) > 1:
+                    return path[1]
+        
+        # Fallback: No unvisited hexes or pathfinding failed
+        # Choose least visited neighbor with lowest cost
+        valid_neighbors.sort(key=lambda x: (
+            self.visit_count[x] * 5,  # Weight visit count more heavily
+            costs[x],
+            random.random()  # Add some randomness
+        ))
+        return valid_neighbors[0]
+
+
     
     def _detect_loop(self):
         """Detect if we're stuck in a loop by analyzing recent movement patterns"""
