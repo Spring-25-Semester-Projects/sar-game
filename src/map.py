@@ -24,8 +24,8 @@ class Map:
         min_screenHex = np.floor(np.min(screen_to_hex_matrix, axis=0))-2
         max_screenHex = np.ceil(np.max(screen_to_hex_matrix, axis=0))+2
 
-        self.min_x, self.min_z = min_screenHex
-        self.max_x, self.max_z = max_screenHex
+        self.min_x, self.min_z = map(int, min_screenHex)
+        self.max_x, self.max_z = map(int, max_screenHex)
 
         min_x, min_z = map(int, min_screenHex)
         max_x, max_z = map(int, max_screenHex)

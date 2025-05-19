@@ -8,6 +8,7 @@ import numpy as np
 from src.map import Map
 from src.entities.survivor import Survivor
 from src.entities.rescuer import Rescuer
+from utils.field_of_view import *
 from config import WIDTH, HEIGHT, FPS, DEBUG, SIZE, OFFSET, COST_COLORS
 
 if DEBUG:
@@ -43,6 +44,7 @@ class Game:
         self.events_info = []
         self.map = Map(radius)
         self.costs = self.map.map_cost()
+        self.visible = {}
         self.entities = Entities(Survivor(self.map), Rescuer(self.map))
         self.visited = deque([self.entities.rescuer.hexEntity])
 
@@ -63,7 +65,12 @@ class Game:
         if h in self.visited:
             return None
 
-        self.visited.append(h)    
+        self.visited.append(h)  
+
+    def see_hex(self):
+        q = self.entities.rescuer.hexEntity
+        
+        self.visible = field_of_view(q, self.map, self.costs, limit=-1)  
 
     def handle_single_event(self, event):
         if event.type == pygame.QUIT:
@@ -84,6 +91,7 @@ class Game:
             if dir:
                 moved = self.entities.rescuer.move(dir)
                 self.discover_hex()
+                self.see_hex()
 
                 if moved == None:
                     dir = "nowhere"
@@ -118,10 +126,10 @@ class Game:
             if self.debugger.toggleOverlay and self.debugger.removeFog:
                 return color, border_color
 
-        if not (h in self.visited):
+        if not h in self.visible or not h in self.visited:
             border_color,color = (0,0,0),(0,0,0)
 
-        if any(neighbor == h for neighbor in  self.map.neighbor_hex(self.entities.rescuer.hexEntity)):
+        if h not in self.visited and any(neighbor == h for neighbor in  self.map.neighbor_hex(self.entities.rescuer.hexEntity)):
             if color == (0,0,0):
                 color = (30,30,30)
                 border_color = (30,30,30)

@@ -15,5 +15,7 @@ OFFSET = np.array([WIDTH/2, HEIGHT/2])
 
 SIZE = 13
 
+SEGEMENT = 5
+
 load_dotenv()
 DEBUG = os.getenv("DEBUG")
